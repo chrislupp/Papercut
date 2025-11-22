@@ -18,18 +18,47 @@ output:
 
 # ===== FILES TO CONVERT =====
 files:
-  # List of source code files to convert to PDF
-  # Each entry must have a 'path' field
+  # List of source code files/patterns to convert to PDF
+  # Supports: individual files, glob patterns, directories
+
+  # Example 1: Individual file with custom title
   - path: src/main.rs
     # Optional: Custom title for this file in the PDF
     # If not specified, the filename will be used
     title: "Main Entry Point"
 
-  - path: src/lib.rs
-    title: "Library Code"
+  # Example 2: Glob pattern to match multiple files
+  # Matches all .rs files in src/ directory (non-recursive)
+  - path: "src/*.rs"
 
+  # Example 3: Recursive glob pattern
+  # Matches all .rs files in src/ and subdirectories
+  - path: "src/**/*.rs"
+    # Optional: Include only specific file types
+    # (Extensions without the dot, e.g., "rs", "py", "js")
+    include_types: ["rs"]
+    # Optional: Exclude patterns (using glob syntax)
+    # Can exclude specific files or patterns
+    exclude: ["*.test.rs", "*/tests/*"]
+
+  # Example 4: Directory scanning with filters
+  # Scans the entire 'src' directory recursively
+  - path: src/
+    # Only include Rust and TOML files
+    include_types: ["rs", "toml"]
+    # Exclude test files and build artifacts
+    exclude:
+      - "*.test.rs"
+      - "target/**"
+      - "**/tests/**"
+
+  # Example 5: Simple file without filters
   - path: README.md
     # title is optional - will default to "README.md"
+
+  # Example 6: Multiple patterns with wildcard
+  - path: "examples/*.yaml"
+    exclude: ["*_backup.yaml"]
 
 # ===== SYNTAX HIGHLIGHTING =====
 syntax_highlighting:
