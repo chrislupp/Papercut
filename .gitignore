@@ -19,3 +19,16 @@ target
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Generated PDF output files
+output/
+releases/
+
+# Backup files from development
+**/*_old.rs
+**/*_backup.rs
+**/*_old*.rs
+
+# macOS system files
+.DS_Store
+**/.DS_Store
