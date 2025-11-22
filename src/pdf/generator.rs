@@ -115,23 +115,80 @@ fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
     Ok(())
 }
 
+/// Load font family, trying multiple sources with fallback
+fn load_font_family() -> genpdf::fonts::FontFamily<genpdf::fonts::FontData> {
+    // Try loading from standard font directories first
+    let font_configs = vec![
+        ("./fonts", "LiberationSans"),
+        ("/usr/share/fonts/truetype/liberation", "LiberationSans"),
+        ("/usr/share/fonts/liberation", "LiberationSans"),
+        ("/usr/share/fonts/truetype/dejavu", "DejaVuSans"),
+        ("/usr/share/fonts/dejavu", "DejaVuSans"),
+    ];
+
+    for (path, font_name) in font_configs {
+        if let Ok(family) = genpdf::fonts::from_files(path, font_name, None) {
+            return family;
+        }
+    }
+
+    // Fallback: Try to load Arial from macOS system fonts directly
+    let arial_path = "/System/Library/Fonts/Supplemental/Arial.ttf";
+    if std::path::Path::new(arial_path).exists() {
+        if let (Ok(reg_data), Ok(bold_data), Ok(italic_data), Ok(bi_data)) = (
+            std::fs::read("/System/Library/Fonts/Supplemental/Arial.ttf"),
+            std::fs::read("/System/Library/Fonts/Supplemental/Arial Bold.ttf")
+                .or_else(|_| std::fs::read("/System/Library/Fonts/Supplemental/Arial.ttf")),
+            std::fs::read("/System/Library/Fonts/Supplemental/Arial Italic.ttf")
+                .or_else(|_| std::fs::read("/System/Library/Fonts/Supplemental/Arial.ttf")),
+            std::fs::read("/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf")
+                .or_else(|_| std::fs::read("/System/Library/Fonts/Supplemental/Arial.ttf")),
+        ) {
+            if let (Ok(regular), Ok(bold), Ok(italic), Ok(bold_italic)) = (
+                genpdf::fonts::FontData::new(reg_data, None),
+                genpdf::fonts::FontData::new(bold_data, None),
+                genpdf::fonts::FontData::new(italic_data, None),
+                genpdf::fonts::FontData::new(bi_data, None),
+            ) {
+                return genpdf::fonts::FontFamily {
+                    regular,
+                    bold,
+                    italic,
+                    bold_italic,
+                };
+            }
+        }
+    }
+
+    // If we reach here, we couldn't find any fonts
+    panic!(
+        "Unable to load fonts. Please install fonts by running:\n\
+         \n\
+         On macOS:\n\
+           brew install font-liberation\n\
+         \n\
+         On Ubuntu/Debian:\n\
+           sudo apt-get install fonts-liberation\n\
+         \n\
+         On Fedora:\n\
+           sudo dnf install liberation-fonts\n\
+         \n\
+         Or download Liberation fonts from:\n\
+           https://github.com/liberationfonts/liberation-fonts/releases\n\
+         \n\
+         And place them in a './fonts' directory next to your executable."
+    );
+}
+
 /// Create a new document with the configured settings
 fn create_document(config: &Config) -> Result<Document> {
     // Get page size
     let (width_mm, height_mm) = styling::get_page_size(&config.page.size);
 
-    // Load the default font family
-    let default_font_family = genpdf::fonts::from_files("./fonts", "LiberationSans", None)
-        .unwrap_or_else(|_| {
-            // If that fails, try loading from common system font paths
-            genpdf::fonts::from_files("/usr/share/fonts/truetype/liberation", "LiberationSans", None)
-                .unwrap_or_else(|_| {
-                    // If all else fails, use printpdf's default font
-                    panic!("Unable to load fonts. Please ensure font files are available.")
-                })
-        });
+    // Try to load fonts from various locations, use built-in font as fallback
+    let font_family = load_font_family();
 
-    let mut doc = Document::new(default_font_family);
+    let mut doc = Document::new(font_family);
 
     // Set page size using genpdf::Size
     doc.set_paper_size(genpdf::Size::new(width_mm, height_mm));

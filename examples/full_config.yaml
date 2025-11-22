@@ -1,5 +1,6 @@
 # Papercut - Full Configuration Example
 # This file demonstrates ALL available configuration options
+# Run from repo root: cargo run --release -- -c examples/full_config.yaml
 
 # ===== OUTPUT CONFIGURATION =====
 output:
@@ -21,44 +22,35 @@ files:
   # List of source code files/patterns to convert to PDF
   # Supports: individual files, glob patterns, directories
 
-  # Example 1: Individual file with custom title
-  - path: src/main.rs
-    # Optional: Custom title for this file in the PDF
-    # If not specified, the filename will be used
-    title: "Main Entry Point"
-
-  # Example 2: Glob pattern to match multiple files
-  # Matches all .rs files in src/ directory (non-recursive)
-  - path: "src/*.rs"
-
-  # Example 3: Recursive glob pattern
-  # Matches all .rs files in src/ and subdirectories
-  - path: "src/**/*.rs"
-    # Optional: Include only specific file types
-    # (Extensions without the dot, e.g., "rs", "py", "js")
-    include_types: ["rs"]
-    # Optional: Exclude patterns (using glob syntax)
-    # Can exclude specific files or patterns
-    exclude: ["*.test.rs", "*/tests/*"]
-
-  # Example 4: Directory scanning with filters
+  # Example 1: Directory scanning with filters
   # Scans the entire 'src' directory recursively
   - path: src/
-    # Only include Rust and TOML files
-    include_types: ["rs", "toml"]
+    # Only include Rust files
+    include_types: ["rs"]
     # Exclude test files and build artifacts
     exclude:
-      - "*.test.rs"
       - "target/**"
-      - "**/tests/**"
+    title: "Source Code"
 
-  # Example 5: Simple file without filters
-  - path: README.md
-    # title is optional - will default to "README.md"
-
-  # Example 6: Multiple patterns with wildcard
+  # Example 2: Glob pattern to match multiple files
+  # Matches all YAML files in examples/ directory
   - path: "examples/*.yaml"
-    exclude: ["*_backup.yaml"]
+    title: "Configuration Examples"
+
+  # Example 3: Individual files with custom titles
+  - path: README.md
+    title: "Project Documentation"
+
+  - path: LICENSE
+    title: "License Agreement"
+
+  - path: Cargo.toml
+    title: "Project Manifest"
+
+  # Example 4: Pattern with wildcards
+  # Matches all markdown files in docs directory
+  - path: "docs/*.md"
+    title: "Documentation"
 
 # ===== SYNTAX HIGHLIGHTING =====
 syntax_highlighting:

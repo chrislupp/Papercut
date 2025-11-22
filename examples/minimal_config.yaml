@@ -1,5 +1,6 @@
 # Minimal Papercut Configuration
 # This shows the bare minimum required to generate a PDF
+# Run from repo root: cargo run --release -- -c examples/minimal_config.yaml
 
 output:
   mode: single
@@ -8,4 +9,5 @@ output:
 
 files:
   - path: src/main.rs
-  - path: src/lib.rs
+  - path: src/config.rs
+  - path: README.md

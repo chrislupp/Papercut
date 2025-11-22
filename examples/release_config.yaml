@@ -1,5 +1,6 @@
 # Release Configuration Example
 # Suitable for public release processes with proper disclaimers
+# Run from repo root: cargo run --release -- -c examples/release_config.yaml
 
 output:
   mode: single
@@ -9,8 +10,10 @@ output:
 files:
   - path: src/main.rs
     title: "Main Application"
-  - path: src/lib.rs
-    title: "Core Library"
+  - path: src/config.rs
+    title: "Configuration Module"
+  - path: src/error.rs
+    title: "Error Handling"
   - path: LICENSE
     title: "License Agreement"
   - path: README.md
