@@ -1,5 +1,8 @@
+mod colors;
+mod code_block;
+mod fonts;
 mod generator;
-mod layout;
-mod styling;
+mod krilla_doc;
+mod text_layout;
 
 pub use generator::generate;
