@@ -35,6 +35,8 @@ papercut --config config.yaml
 
 ### Features
 
+- **Directory Scanning & Glob Patterns**: Use wildcards (`*.rs`, `src/**/*.py`) and scan entire directories
+- **File Filtering**: Include/exclude specific file types and patterns
 - **Single or Multiple PDFs**: Combine all files or create separate PDFs
 - **Syntax Highlighting**: Optional syntax highlighting with multiple themes
 - **Customizable Headers/Footers**: Add page numbers, dates, filenames, and custom text
@@ -48,6 +50,7 @@ See the `examples/` directory:
 - `minimal_config.yaml` - Bare minimum configuration
 - `full_config.yaml` - All available options with comments
 - `release_config.yaml` - Public release template
+- `patterns_config.yaml` - Directory scanning and pattern matching examples
 
 ### Documentation
 

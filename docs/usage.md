@@ -168,6 +168,97 @@ This creates:
 - `./pdfs/lib.pdf`
 - `./pdfs/utils.pdf`
 
+### Pattern Matching and Directory Scanning
+
+**NEW**: Papercut supports glob patterns, directory scanning, and file filtering.
+
+#### Scan an entire directory
+
+Configuration file `scan_dir.yaml`:
+
+```yaml
+output:
+  mode: single
+  directory: ./output
+  filename: all_code.pdf
+
+files:
+  # Scan src/ directory for all Rust files
+  - path: src/
+    include_types: ["rs"]
+    exclude: ["*.test.rs", "target/**"]
+```
+
+Generate:
+
+```bash
+papercut -c scan_dir.yaml -v
+```
+
+This will:
+1. Scan the `src/` directory recursively
+2. Include only `.rs` files
+3. Exclude test files and target directory
+
+#### Use glob patterns
+
+Configuration file `patterns.yaml`:
+
+```yaml
+output:
+  mode: single
+
+files:
+  # All Rust files in src/ and subdirectories
+  - path: "src/**/*.rs"
+
+  # All YAML files in examples/
+  - path: "examples/*.yaml"
+
+  # All markdown files in root
+  - path: "*.md"
+```
+
+Generate:
+
+```bash
+papercut -c patterns.yaml
+```
+
+#### Complex filtering
+
+Configuration file `filtered.yaml`:
+
+```yaml
+output:
+  mode: single
+
+files:
+  # Source code (Rust and TOML only, no tests)
+  - path: src/
+    include_types: ["rs", "toml"]
+    exclude:
+      - "*.test.rs"
+      - "**/tests/**"
+      - "target/**"
+    title: "Source Code"
+
+  # Documentation
+  - path: "docs/**/*.md"
+    title: "Documentation"
+
+  # Examples (only Rust files)
+  - path: examples/
+    include_types: ["rs"]
+    title: "Examples"
+```
+
+Generate:
+
+```bash
+papercut -c filtered.yaml -v
+```
+
 ### Release Documentation with Headers/Footers
 
 Configuration file `release.yaml`:

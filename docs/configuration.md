@@ -42,26 +42,95 @@ output:
 
 ## Files Configuration
 
-List of source code files to convert to PDF.
+Specify which files to convert to PDF. Supports individual files, glob patterns, and directory scanning with filters.
 
 ```yaml
 files:
+  # Individual file
   - path: src/main.rs
     title: "Main Entry Point"
-  - path: src/lib.rs
-  - path: README.md
-    title: "Documentation"
+
+  # Glob pattern
+  - path: "src/**/*.rs"
+    include_types: ["rs"]
+    exclude: ["*.test.rs"]
+
+  # Directory with filters
+  - path: src/
+    include_types: ["rs", "toml"]
+    exclude: ["target/**", "**/tests/**"]
 ```
 
 ### Fields
 
-- **path** (required): Path to the source file
+- **path** (required): Path, pattern, or directory
+  - **Individual file**: `src/main.rs`
+  - **Glob pattern**: `src/**/*.rs` (recursive), `src/*.rs` (non-recursive)
+  - **Directory**: `src/` (scans recursively)
   - Can be relative or absolute
-  - File must exist
+  - Use quotes for patterns with wildcards
 
-- **title** (optional): Custom title for this file in the PDF
+- **title** (optional): Custom title for this file/group in the PDF
   - If not specified, the filename will be used
   - Displayed as a separator in single-file mode
+  - When using patterns, applies to all matched files
+
+- **include_types** (optional, default: all types): File extensions to include
+  - List of extensions without dots: `["rs", "py", "js"]`
+  - Only files with these extensions will be included
+  - If empty or omitted, all file types are included
+  - Works with directories and glob patterns
+
+- **exclude** (optional, default: none): Exclusion patterns
+  - List of glob patterns: `["*.test.rs", "target/**"]`
+  - Files matching these patterns will be excluded
+  - Useful for excluding test files, build artifacts, etc.
+  - Patterns are matched against the full file path
+
+### Pattern Syntax
+
+**Glob Wildcards:**
+- `*` - Matches any number of characters (excluding `/`)
+- `**` - Matches any number of directories
+- `?` - Matches a single character
+- `[abc]` - Matches any character in brackets
+
+**Examples:**
+- `*.rs` - All Rust files in current directory
+- `**/*.py` - All Python files recursively
+- `src/**/*.{rs,toml}` - All Rust and TOML files in src/
+- `test_*.rs` - Files starting with `test_`
+
+### Examples
+
+**Example 1: All Rust files in a directory (excluding tests)**
+```yaml
+files:
+  - path: src/
+    include_types: ["rs"]
+    exclude: ["*.test.rs", "**/tests/**"]
+```
+
+**Example 2: Specific file patterns**
+```yaml
+files:
+  - path: "src/**/*.rs"
+  - path: "examples/*.yaml"
+  - path: "*.md"
+```
+
+**Example 3: Multiple directories with different filters**
+```yaml
+files:
+  - path: src/
+    include_types: ["rs"]
+    exclude: ["target/**"]
+    title: "Source Code"
+
+  - path: examples/
+    include_types: ["rs", "yaml"]
+    title: "Examples"
+```
 
 ## Syntax Highlighting Configuration
 
