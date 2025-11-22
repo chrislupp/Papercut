@@ -28,6 +28,8 @@ thiserror = "1.0"
 
 # File operations and utilities
 chrono = "0.4"
+glob = "0.3"
+walkdir = "2.5"
 
 [features]
 default = ["syntax-highlighting"]
