@@ -1,0 +1,11 @@
+# Minimal Papercut Configuration
+# This shows the bare minimum required to generate a PDF
+
+output:
+  mode: single
+  directory: ./output
+  filename: output.pdf
+
+files:
+  - path: src/main.rs
+  - path: src/lib.rs

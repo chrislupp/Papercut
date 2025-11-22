@@ -1,0 +1,144 @@
+# Papercut - Full Configuration Example
+# This file demonstrates ALL available configuration options
+
+# ===== OUTPUT CONFIGURATION =====
+output:
+  # Output mode: "single" for one combined PDF, "multiple" for one PDF per source file
+  # - single: All files are combined into one PDF document
+  # - multiple: Each source file gets its own separate PDF
+  mode: single
+
+  # Directory where PDF files will be saved
+  # Path can be relative or absolute
+  directory: ./output
+
+  # Filename for the output PDF (only used when mode is "single")
+  # For "multiple" mode, filenames are derived from source files
+  filename: combined_output.pdf
+
+# ===== FILES TO CONVERT =====
+files:
+  # List of source code files to convert to PDF
+  # Each entry must have a 'path' field
+  - path: src/main.rs
+    # Optional: Custom title for this file in the PDF
+    # If not specified, the filename will be used
+    title: "Main Entry Point"
+
+  - path: src/lib.rs
+    title: "Library Code"
+
+  - path: README.md
+    # title is optional - will default to "README.md"
+
+# ===== SYNTAX HIGHLIGHTING =====
+syntax_highlighting:
+  # Enable or disable syntax highlighting
+  # Requires the 'syntax-highlighting' feature to be enabled (default)
+  enabled: true
+
+  # Syntax highlighting theme name
+  # Available themes depend on syntect library
+  # Popular themes: "base16-ocean.dark", "base16-ocean.light",
+  #                 "InspiredGitHub", "Solarized (dark)", "Solarized (light)"
+  # Run 'papercut --list-themes' to see all available themes
+  theme: base16-ocean.dark
+
+# ===== PAGE SETTINGS =====
+page:
+  # Paper size: A4, Letter, or Legal
+  # - A4: 210mm x 297mm (common in Europe, Asia)
+  # - Letter: 8.5" x 11" (common in North America)
+  # - Legal: 8.5" x 14" (common for legal documents)
+  size: A4
+
+  # Page margins in centimeters
+  margins:
+    top: 2.5
+    bottom: 2.5
+    left: 2.0
+    right: 2.0
+
+  # Font size for code content (in points)
+  # Typical values: 8-12
+  font_size: 10
+
+  # Show line numbers on the left side of code
+  line_numbers: true
+
+  # Line spacing multiplier
+  # 1.0 = single spacing, 1.5 = 1.5x spacing, 2.0 = double spacing
+  # Typical values: 1.0-1.5
+  line_spacing: 1.2
+
+# ===== HEADER CONFIGURATION =====
+header:
+  # Enable or disable page headers
+  enabled: true
+
+  # Header text alignment: left, center, right
+  # Supports variable substitution:
+  # - {page}: Current page number
+  # - {total}: Total number of pages
+  # - {filename}: Current source file name
+  # - {date}: Current date (YYYY-MM-DD format)
+  left: "CONFIDENTIAL - Internal Use Only"
+  center: ""
+  right: "Page {page} of {total}"
+
+  # Font size for header text (in points)
+  font_size: 8
+
+# ===== FOOTER CONFIGURATION =====
+footer:
+  # Enable or disable page footers
+  enabled: true
+
+  # Footer text alignment: left, center, right
+  # Supports the same variable substitution as headers
+  left: "Generated: {date}"
+  center: "{filename}"
+  right: "© 2024 Your Company"
+
+  # Font size for footer text (in points)
+  font_size: 8
+
+# ===== STYLING OPTIONS =====
+styling:
+  # Font family for code rendering
+  # Options: monospace, courier, dejavu
+  # - monospace: Generic monospace font
+  # - courier: Courier New font
+  # - dejavu: DejaVu Sans Mono font
+  font_family: monospace
+
+  # Background color for code blocks (hex color format)
+  # Use "#ffffff" for white, "#f5f5f5" for light gray, etc.
+  background_color: "#ffffff"
+
+  # Text color for code (hex color format)
+  # Use "#000000" for black, "#2e3440" for dark gray, etc.
+  # Note: This is overridden when syntax highlighting is enabled
+  text_color: "#000000"
+
+  # Color for line numbers (hex color format)
+  line_number_color: "#888888"
+
+# ===== PDF METADATA =====
+metadata:
+  # PDF document title (appears in PDF properties)
+  title: "Source Code Documentation"
+
+  # PDF document author (appears in PDF properties)
+  author: "Engineering Team"
+
+  # PDF document subject (appears in PDF properties)
+  subject: "Code Review and Documentation"
+
+  # PDF document keywords (array of strings)
+  # Useful for searchability and organization
+  keywords:
+    - source code
+    - documentation
+    - review
+    - internal
