@@ -6,6 +6,9 @@ use crate::error::{PapercutError, Result};
 pub struct Config {
     pub output: OutputConfig,
     pub files: Vec<FileEntry>,
+    /// Expanded file list (populated after pattern expansion)
+    #[serde(skip)]
+    pub expanded_files: Vec<ExpandedFileEntry>,
     #[serde(default)]
     pub syntax_highlighting: SyntaxHighlightingConfig,
     #[serde(default)]
@@ -18,6 +21,13 @@ pub struct Config {
     pub styling: StylingConfig,
     #[serde(default)]
     pub metadata: MetadataConfig,
+}
+
+/// Expanded file entry after pattern matching
+#[derive(Debug, Clone)]
+pub struct ExpandedFileEntry {
+    pub path: PathBuf,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -45,6 +55,14 @@ pub struct FileEntry {
     /// Optional custom title for this file in the PDF
     #[serde(default)]
     pub title: Option<String>,
+    /// File types to include (by extension, e.g., ["rs", "py", "js"])
+    /// If empty, all file types are included
+    #[serde(default)]
+    pub include_types: Vec<String>,
+    /// Patterns to exclude (e.g., ["*.test.rs", "target/**"])
+    /// Uses glob pattern syntax
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -291,25 +309,67 @@ impl Config {
         let contents = std::fs::read_to_string(path)
             .map_err(|e| PapercutError::Config(format!("Failed to read config file: {}", e)))?;
 
-        let config: Config = serde_yaml::from_str(&contents)?;
+        let mut config: Config = serde_yaml::from_str(&contents)?;
+
+        // Expand file patterns before validation
+        config.expand_file_patterns()?;
         config.validate()?;
+
         Ok(config)
+    }
+
+    /// Expand file patterns and populate expanded_files
+    fn expand_file_patterns(&mut self) -> Result<()> {
+        use crate::file_scanner;
+
+        let mut expanded_files = Vec::new();
+
+        for file_entry in &self.files {
+            let files = file_scanner::expand_file_patterns(
+                &file_entry.path,
+                &file_entry.include_types,
+                &file_entry.exclude,
+            )?;
+
+            // Add each expanded file with the original title (if provided)
+            for file_path in files {
+                expanded_files.push(ExpandedFileEntry {
+                    path: file_path,
+                    title: file_entry.title.clone(),
+                });
+            }
+        }
+
+        self.expanded_files = expanded_files;
+        Ok(())
     }
 
     /// Validate the configuration
     fn validate(&self) -> Result<()> {
-        // Validate that we have at least one file
+        // Validate that we have at least one file specification
         if self.files.is_empty() {
             return Err(PapercutError::InvalidConfig(
                 "No files specified in configuration".to_string()
             ));
         }
 
-        // Validate that all files exist
-        for file_entry in &self.files {
+        // Validate that pattern expansion resulted in at least one file
+        if self.expanded_files.is_empty() {
+            return Err(PapercutError::InvalidConfig(
+                "No files matched the specified patterns".to_string()
+            ));
+        }
+
+        // Validate that all expanded files exist and are readable
+        for file_entry in &self.expanded_files {
             if !file_entry.path.exists() {
                 return Err(PapercutError::FileNotFound(
                     file_entry.path.display().to_string()
+                ));
+            }
+            if !file_entry.path.is_file() {
+                return Err(PapercutError::InvalidConfig(
+                    format!("{} is not a regular file", file_entry.path.display())
                 ));
             }
         }

@@ -1,5 +1,6 @@
 mod config;
 mod error;
+mod file_scanner;
 mod pdf;
 
 #[cfg(feature = "syntax-highlighting")]
@@ -53,7 +54,8 @@ fn main() -> Result<()> {
     if args.verbose {
         println!("Configuration loaded successfully");
         println!("Output mode: {:?}", config.output.mode);
-        println!("Files to process: {}", config.files.len());
+        println!("File patterns specified: {}", config.files.len());
+        println!("Files matched: {}", config.expanded_files.len());
     }
 
     // Create output directory if it doesn't exist

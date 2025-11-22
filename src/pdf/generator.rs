@@ -20,7 +20,7 @@ pub fn generate(config: Config, verbose: bool) -> Result<()> {
 /// Generate a single PDF containing all files
 fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Generating single PDF with {} files", config.files.len());
+        println!("Generating single PDF with {} files", config.expanded_files.len());
     }
 
     let output_path = config
@@ -31,11 +31,11 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
     let mut doc = create_document(&config)?;
 
     // Process each file and add to the document
-    for (idx, file_entry) in config.files.iter().enumerate() {
+    for (idx, file_entry) in config.expanded_files.iter().enumerate() {
         if verbose {
             println!("  Processing file {}/{}: {}",
                 idx + 1,
-                config.files.len(),
+                config.expanded_files.len(),
                 file_entry.path.display()
             );
         }
@@ -56,7 +56,7 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
         add_file_content(&mut doc, &content, &file_entry.path, &config)?;
 
         // Add page break between files (except for last file)
-        if idx < config.files.len() - 1 {
+        if idx < config.expanded_files.len() - 1 {
             doc.push(elements::PageBreak::new());
         }
     }
@@ -77,14 +77,14 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
 /// Generate multiple PDFs, one per file
 fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
     if verbose {
-        println!("Generating {} separate PDFs", config.files.len());
+        println!("Generating {} separate PDFs", config.expanded_files.len());
     }
 
-    for (idx, file_entry) in config.files.iter().enumerate() {
+    for (idx, file_entry) in config.expanded_files.iter().enumerate() {
         if verbose {
             println!("  Processing file {}/{}: {}",
                 idx + 1,
-                config.files.len(),
+                config.expanded_files.len(),
                 file_entry.path.display()
             );
         }
