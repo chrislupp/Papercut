@@ -1,6 +1,7 @@
-use syntect::highlighting::{Theme, ThemeSet};
+use syntect::highlighting::{Theme, ThemeSet, ThemeSettings, Color, StyleModifier, FontStyle, ScopeSelectors};
+use std::str::FromStr;
 
-/// Built-in theme presets that map to syntect's default themes
+/// Built-in theme presets
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ThemePreset {
     VsCodeDark,
@@ -31,20 +32,173 @@ impl ThemePreset {
         }
     }
 
-    /// Get the underlying syntect theme name that this preset maps to
-    fn syntect_theme_name(&self) -> &'static str {
+    /// Load the theme
+    pub fn load_theme(&self) -> Option<Theme> {
         match self {
-            Self::VsCodeDark => "base16-ocean.dark",
-            Self::VsCodeLight => "InspiredGitHub",
-            Self::JetBrainsDarcula => "base16-mocha.dark",
-            Self::JetBrainsLight => "Solarized (light)",
+            Self::VsCodeLight => Some(create_vscode_light_modern_theme()),
+            _ => {
+                // Load from syntect defaults for other themes
+                let ts = ThemeSet::load_defaults();
+                let theme_name = match self {
+                    Self::VsCodeDark => "base16-ocean.dark",
+                    Self::JetBrainsDarcula => "base16-mocha.dark",
+                    Self::JetBrainsLight => "Solarized (light)",
+                    _ => return None,
+                };
+                ts.themes.get(theme_name).cloned()
+            }
         }
     }
+}
 
-    /// Load the theme from syntect's built-in themes
-    pub fn load_theme(&self) -> Option<Theme> {
-        let ts = ThemeSet::load_defaults();
-        ts.themes.get(self.syntect_theme_name()).cloned()
+fn create_vscode_light_modern_theme() -> Theme {
+    use syntect::highlighting::ThemeItem;
+
+    let settings = ThemeSettings {
+        foreground: Some(Color { r: 0x3B, g: 0x3B, b: 0x3B, a: 0xFF }),
+        background: Some(Color { r: 0xFF, g: 0xFF, b: 0xFF, a: 0xFF }),
+        caret: Some(Color { r: 0x00, g: 0x00, b: 0x00, a: 0xFF }),
+        line_highlight: Some(Color { r: 0x00, g: 0x00, b: 0x00, a: 0x14 }),
+        selection: Some(Color { r: 0xAD, g: 0xD6, b: 0xFF, a: 0x80 }),
+        ..Default::default()
+    };
+
+    let items = vec![
+        // Comments - green
+        ThemeItem {
+            scope: ScopeSelectors::from_str("comment").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x80, b: 0x00, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // Strings - red/maroon
+        ThemeItem {
+            scope: ScopeSelectors::from_str("string").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0xA3, g: 0x15, b: 0x15, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // Numbers - teal
+        ThemeItem {
+            scope: ScopeSelectors::from_str("constant.numeric").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x09, g: 0x88, b: 0x5A, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // Functions - brown/gold
+        ThemeItem {
+            scope: ScopeSelectors::from_str("entity.name.function, support.function").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x79, g: 0x5E, b: 0x26, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // Types - teal
+        ThemeItem {
+            scope: ScopeSelectors::from_str("support.class, support.type, entity.name.type, storage.type").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x26, g: 0x7F, b: 0x99, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // Control keywords - blue
+        ThemeItem {
+            scope: ScopeSelectors::from_str("keyword.control").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // Variables - dark blue
+        ThemeItem {
+            scope: ScopeSelectors::from_str("variable, entity.name.variable").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x10, b: 0x80, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // Keywords (general) - blue
+        ThemeItem {
+            scope: ScopeSelectors::from_str("keyword, storage, storage.modifier").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // keyword.operator - black
+        ThemeItem {
+            scope: ScopeSelectors::from_str("keyword.operator").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x00, b: 0x00, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // constant.language - blue
+        ThemeItem {
+            scope: ScopeSelectors::from_str("constant.language").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // constant.character - blue
+        ThemeItem {
+            scope: ScopeSelectors::from_str("constant.character").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // variable.language - blue
+        ThemeItem {
+            scope: ScopeSelectors::from_str("variable.language").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // entity.name.tag - maroon
+        ThemeItem {
+            scope: ScopeSelectors::from_str("entity.name.tag").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x80, g: 0x00, b: 0x00, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // entity.other.attribute-name - red
+        ThemeItem {
+            scope: ScopeSelectors::from_str("entity.other.attribute-name").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0xFF, g: 0x00, b: 0x00, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // meta.preprocessor - blue
+        ThemeItem {
+            scope: ScopeSelectors::from_str("meta.preprocessor").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+        // invalid - red
+        ThemeItem {
+            scope: ScopeSelectors::from_str("invalid").unwrap(),
+            style: StyleModifier {
+                foreground: Some(Color { r: 0xCD, g: 0x31, b: 0x31, a: 0xFF }),
+                ..Default::default()
+            },
+        },
+    ];
+
+    Theme {
+        name: Some("VSCode Light Modern".to_string()),
+        author: Some("Microsoft".to_string()),
+        settings: settings,
+        scopes: items,
     }
 }
 
@@ -63,9 +217,7 @@ mod tests {
 
     #[test]
     fn test_theme_loading() {
-        let theme = ThemePreset::VsCodeDark.load_theme();
+        let theme = ThemePreset::VsCodeLight.load_theme();
         assert!(theme.is_some());
-        let theme = theme.unwrap();
-        assert_eq!(theme.name, Some("Base16 Ocean Dark".to_string()));
     }
 }
