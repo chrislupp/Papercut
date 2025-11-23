@@ -508,6 +508,19 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
         println!("Rendering PDF to: {}", output_path.display());
     }
 
+    // Check if file exists and prompt user
+    if output_path.exists() {
+        print!("File '{}' already exists. Overwrite? [y/N]: ", output_path.display());
+        use std::io::{self, Write};
+        io::stdout().flush().unwrap();
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        if !input.trim().eq_ignore_ascii_case("y") {
+            println!("Skipping file.");
+            return Ok(());
+        }
+    }
+
     ctx.save(&output_path)?;
 
     println!("✓ Generated: {}", output_path.display());
