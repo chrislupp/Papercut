@@ -1,4 +1,5 @@
 use crate::error::{PapercutError, Result};
+use crate::warnings::{WarningManager, WarningCategory};
 use fontdb::{Database, Query, Source};
 use krilla::text::Font;
 use std::sync::Arc;
@@ -7,11 +8,12 @@ use std::sync::Arc;
 pub struct FontManager {
     db: Database,
     monospace_font: Option<Arc<Font>>,
+    warning_manager: Arc<WarningManager>,
 }
 
 impl FontManager {
     /// Create a new font manager and load system fonts
-    pub fn new() -> Self {
+    pub fn new(warning_manager: Arc<WarningManager>) -> Self {
         let mut db = Database::new();
 
         // Load system fonts
@@ -20,6 +22,7 @@ impl FontManager {
         Self {
             db,
             monospace_font: None,
+            warning_manager,
         }
     }
 
@@ -43,8 +46,9 @@ impl FontManager {
 
         for family in font_families {
             if let Some(font) = self.try_load_font(family) {
-                self.monospace_font = Some(Arc::new(font));
-                return Ok(Arc::clone(self.monospace_font.as_ref().unwrap()));
+                let font_arc = Arc::new(font);
+                self.monospace_font = Some(Arc::clone(&font_arc));
+                return Ok(font_arc);
             }
         }
 
@@ -76,18 +80,28 @@ impl FontManager {
             }
             Source::File(path) => {
                 // Read font file and create Font
-                if let Ok(data) = std::fs::read(path) {
-                    Font::new(data.into(), 0)
-                } else {
-                    None
+                match std::fs::read(path) {
+                    Ok(data) => Font::new(data.into(), 0),
+                    Err(e) => {
+                        self.warning_manager.warnf(
+                            WarningCategory::Fonts,
+                            format!("Failed to read font file '{}': {}", path.display(), e)
+                        );
+                        None
+                    }
                 }
             }
             Source::SharedFile(path, _) => {
                 // Read font file and create Font
-                if let Ok(data) = std::fs::read(path) {
-                    Font::new(data.into(), 0)
-                } else {
-                    None
+                match std::fs::read(path) {
+                    Ok(data) => Font::new(data.into(), 0),
+                    Err(e) => {
+                        self.warning_manager.warnf(
+                            WarningCategory::Fonts,
+                            format!("Failed to read shared font file '{}': {}", path.display(), e)
+                        );
+                        None
+                    }
                 }
             }
         }
@@ -114,7 +128,7 @@ impl FontManager {
 
 impl Default for FontManager {
     fn default() -> Self {
-        Self::new()
+        Self::new(Arc::new(WarningManager::new(false)))
     }
 }
 
@@ -124,13 +138,13 @@ mod tests {
 
     #[test]
     fn test_font_manager_creation() {
-        let manager = FontManager::new();
+        let manager = FontManager::new(Arc::new(WarningManager::new(false)));
         assert!(manager.db.faces().count() > 0, "Should load system fonts");
     }
 
     #[test]
     fn test_find_monospace_font() {
-        let mut manager = FontManager::new();
+        let mut manager = FontManager::new(Arc::new(WarningManager::new(false)));
         let result = manager.get_monospace_font();
         assert!(result.is_ok(), "Should find at least one monospace font");
     }
