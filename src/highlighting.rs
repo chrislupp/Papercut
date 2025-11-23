@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{ThemeSet, Style, Color, Theme};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
 use crate::pdf::themes::ThemePreset;
+use crate::warnings::{WarningManager, WarningCategory};
 use std::fs;
 use std::io::Cursor;
 
@@ -20,14 +22,28 @@ pub struct StyledSegment {
 
 /// Try to load a custom theme from .papercut folders
 /// Search order: ./.papercut/themes/ → ~/.papercut/themes/
-fn load_custom_theme(theme_name: &str) -> Option<Theme> {
+fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Option<Theme> {
     // Try project-level .papercut folder first
     let project_theme_path = PathBuf::from("./.papercut/themes").join(format!("{}.tmTheme", theme_name));
     if project_theme_path.exists() {
-        if let Ok(theme_data) = fs::read_to_string(&project_theme_path) {
-            let mut cursor = Cursor::new(theme_data.as_bytes());
-            if let Ok(theme) = ThemeSet::load_from_reader(&mut cursor) {
-                return Some(theme);
+        match fs::read_to_string(&project_theme_path) {
+            Ok(theme_data) => {
+                let mut cursor = Cursor::new(theme_data.as_bytes());
+                match ThemeSet::load_from_reader(&mut cursor) {
+                    Ok(theme) => return Some(theme),
+                    Err(e) => {
+                        warning_manager.warnf(
+                            WarningCategory::Themes,
+                            format!("Failed to parse custom theme '{}': {:?}", project_theme_path.display(), e)
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                warning_manager.warnf(
+                    WarningCategory::Themes,
+                    format!("Failed to read custom theme file '{}': {}", project_theme_path.display(), e)
+                );
             }
         }
     }
@@ -36,10 +52,24 @@ fn load_custom_theme(theme_name: &str) -> Option<Theme> {
     if let Some(home_dir) = dirs::home_dir() {
         let home_theme_path = home_dir.join(".papercut/themes").join(format!("{}.tmTheme", theme_name));
         if home_theme_path.exists() {
-            if let Ok(theme_data) = fs::read_to_string(&home_theme_path) {
-                let mut cursor = Cursor::new(theme_data.as_bytes());
-                if let Ok(theme) = ThemeSet::load_from_reader(&mut cursor) {
-                    return Some(theme);
+            match fs::read_to_string(&home_theme_path) {
+                Ok(theme_data) => {
+                    let mut cursor = Cursor::new(theme_data.as_bytes());
+                    match ThemeSet::load_from_reader(&mut cursor) {
+                        Ok(theme) => return Some(theme),
+                        Err(e) => {
+                            warning_manager.warnf(
+                                WarningCategory::Themes,
+                                format!("Failed to parse custom theme '{}': {:?}", home_theme_path.display(), e)
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    warning_manager.warnf(
+                        WarningCategory::Themes,
+                        format!("Failed to read custom theme file '{}': {}", home_theme_path.display(), e)
+                    );
                 }
             }
         }
@@ -49,7 +79,7 @@ fn load_custom_theme(theme_name: &str) -> Option<Theme> {
 }
 
 /// Highlight code and return styled segments for PDF rendering
-pub fn highlight_code_styled(code: &str, file_path: &Path, theme_name: &str) -> Result<Vec<Vec<StyledSegment>>, String> {
+pub fn highlight_code_styled(code: &str, file_path: &Path, theme_name: &str, warning_manager: &WarningManager) -> Result<Vec<Vec<StyledSegment>>, String> {
     // Load syntax set
     let ss = SyntaxSet::load_defaults_newlines();
 
@@ -64,7 +94,7 @@ pub fn highlight_code_styled(code: &str, file_path: &Path, theme_name: &str) -> 
         // 1. Use built-in theme preset
         preset.load_theme()
             .ok_or_else(|| format!("Failed to load built-in theme preset '{}'", theme_name))?
-    } else if let Some(custom_theme) = load_custom_theme(theme_name) {
+    } else if let Some(custom_theme) = load_custom_theme(theme_name, warning_manager) {
         // 2. Use custom theme from .papercut folders
         custom_theme
     } else {
@@ -101,7 +131,7 @@ pub fn highlight_code_styled(code: &str, file_path: &Path, theme_name: &str) -> 
 }
 
 /// Highlight code using syntect (returns plain text)
-pub fn highlight_code(code: &str, file_path: &Path, theme_name: &str) -> Result<String, String> {
+pub fn highlight_code(code: &str, file_path: &Path, theme_name: &str, warning_manager: &WarningManager) -> Result<String, String> {
     // Load syntax set
     let ss = SyntaxSet::load_defaults_newlines();
 
@@ -116,7 +146,7 @@ pub fn highlight_code(code: &str, file_path: &Path, theme_name: &str) -> Result<
         // 1. Use built-in theme preset
         preset.load_theme()
             .ok_or_else(|| format!("Failed to load built-in theme preset '{}'", theme_name))?
-    } else if let Some(custom_theme) = load_custom_theme(theme_name) {
+    } else if let Some(custom_theme) = load_custom_theme(theme_name, warning_manager) {
         // 2. Use custom theme from .papercut folders
         custom_theme
     } else {
@@ -173,7 +203,8 @@ mod tests {
     fn test_highlight_rust_code() {
         let code = "fn main() {\n    println!(\"Hello, world!\");\n}\n";
         let path = PathBuf::from("test.rs");
-        let result = highlight_code(code, &path, "base16-ocean.dark");
+        let warning_manager = WarningManager::new(false);
+        let result = highlight_code(code, &path, "base16-ocean.dark", &warning_manager);
 
         assert!(result.is_ok());
         let highlighted = result.unwrap();
@@ -185,7 +216,8 @@ mod tests {
     fn test_invalid_theme() {
         let code = "fn main() {}";
         let path = PathBuf::from("test.rs");
-        let result = highlight_code(code, &path, "nonexistent-theme");
+        let warning_manager = WarningManager::new(false);
+        let result = highlight_code(code, &path, "nonexistent-theme", &warning_manager);
 
         assert!(result.is_err());
     }
