@@ -42,6 +42,10 @@ papercut --config config.yaml
 - **Customizable Headers/Footers**: Add page numbers, dates, filenames, and custom text
 - **Flexible Formatting**: Configure page size, margins, fonts, and colors
 - **PDF Metadata**: Set title, author, subject, and keywords
+- **Robust Error Handling**: Detailed error messages with actionable suggestions
+- **Configurable Warnings**: Control warning output by category
+- **Progress Indicators**: Visual progress bars for multi-file processing
+- **Non-Interactive Mode**: Safe operation in CI/CD environments with `--force` flag
 
 ### Example Configurations
 
@@ -61,17 +65,53 @@ Complete documentation is available in the `docs/` directory:
 - [Styling Guide](docs/styling.md) - Advanced styling options
 - [Examples](docs/examples.md) - Real-world use cases
 
-### List Available Themes
+### CLI Flags
 
 ```bash
+# Basic usage
+papercut --config config.yaml
+
+# Verbose output (shows detailed processing information)
+papercut --config config.yaml --verbose
+
+# Suppress all warnings
+papercut --config config.yaml --quiet
+
+# Non-interactive mode (skip prompts, requires --force to overwrite files)
+papercut --config config.yaml --force
+
+# List available syntax highlighting themes
 papercut --list-themes
-```
 
-### Help
-
-```bash
+# Show help
 papercut --help
 ```
+
+### Warning Configuration
+
+Papercut provides detailed warnings for non-critical issues. You can control warnings in your `config.yaml`:
+
+```yaml
+warnings:
+  # Enable or disable all warnings (default: true)
+  enabled: true
+
+  # Selectively silence specific warning categories
+  silence_categories:
+    - fonts        # Font loading issues
+    - themes       # Theme loading issues
+    - highlighting # Syntax highlighting failures
+    - filesystem   # File access and permission issues
+```
+
+**Warning Categories:**
+- `fonts`: Font file read failures and fallback behavior
+- `themes`: Custom theme loading and parsing errors
+- `highlighting`: Syntax highlighting failures (falls back to plain text)
+- `filesystem`: Directory walking errors, permission denied, non-UTF-8 paths
+
+**CLI Override:**
+Use `--quiet` to suppress all warnings regardless of config settings.
 
 ## License
 
