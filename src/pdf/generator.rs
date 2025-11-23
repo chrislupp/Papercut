@@ -3,6 +3,7 @@ use crate::error::{PapercutError, Result};
 use crate::pdf::krilla_doc::PdfContext;
 use crate::pdf::colors::{rgb_to_paint, syntect_to_paint};
 use crate::warnings::WarningManager;
+use indicatif::{ProgressBar, ProgressStyle};
 use krilla::geom::{PathBuilder, Point};
 use krilla::num::NormalizedF32;
 use krilla::paint::{Fill, Stroke};
@@ -177,6 +178,20 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         current_y += 25.0;
     }
 
+    // Create progress bar if processing multiple files and not in verbose mode
+    let progress = if !verbose && config.expanded_files.len() > 1 {
+        let pb = ProgressBar::new(config.expanded_files.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+                .expect("Invalid progress bar template")
+                .progress_chars("=>-")
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
     // Process each file
     for (idx, file_entry) in config.expanded_files.iter().enumerate() {
         if verbose {
@@ -185,6 +200,24 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 config.expanded_files.len(),
                 file_entry.path.display()
             );
+        } else if let Some(ref pb) = progress {
+            pb.set_message(format!("{}", file_entry.path.file_name().unwrap_or_default().to_string_lossy()));
+        }
+
+        // Check file size before reading
+        const MAX_FILE_SIZE_WARNING: u64 = 100 * 1024 * 1024; // 100MB
+        if let Ok(metadata) = fs::metadata(&file_entry.path) {
+            let file_size = metadata.len();
+            if file_size > MAX_FILE_SIZE_WARNING {
+                warning_manager.warnf(
+                    crate::warnings::WarningCategory::Filesystem,
+                    format!(
+                        "File '{}' is very large ({:.2} MB). Processing may be slow or use significant memory.",
+                        file_entry.path.display(),
+                        file_size as f64 / (1024.0 * 1024.0)
+                    )
+                );
+            }
         }
 
         // Read file content
@@ -291,11 +324,22 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         // Try syntax highlighting if enabled
         #[cfg(feature = "syntax-highlighting")]
         let highlighted = if config.syntax_highlighting.enabled {
-            highlighting::highlight_code_styled(
+            match highlighting::highlight_code_styled(
                 &content,
                 &file_entry.path,
-                &config.syntax_highlighting.theme
-            ).ok()
+                &config.syntax_highlighting.theme,
+                &warning_manager
+            ) {
+                Ok(result) => Some(result),
+                Err(e) => {
+                    warning_manager.warnf(
+                        crate::warnings::WarningCategory::Highlighting,
+                        format!("Syntax highlighting failed for '{}': {}. Falling back to plain text.",
+                            file_entry.path.display(), e)
+                    );
+                    None
+                }
+            }
         } else {
             None
         };
@@ -539,6 +583,16 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         }
 
         current_y += 15.0; // Space after file
+
+        // Update progress
+        if let Some(ref pb) = progress {
+            pb.inc(1);
+        }
+    }
+
+    // Finish progress bar
+    if let Some(pb) = progress {
+        pb.finish_with_message("Processing complete");
     }
 
     // Finish last page
@@ -569,6 +623,20 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         println!("Generating {} separate PDFs", config.expanded_files.len());
     }
 
+    // Create progress bar if processing multiple files and not in verbose mode
+    let progress = if !verbose && config.expanded_files.len() > 1 {
+        let pb = ProgressBar::new(config.expanded_files.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+                .expect("Invalid progress bar template")
+                .progress_chars("=>-")
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
     for (idx, file_entry) in config.expanded_files.iter().enumerate() {
         if verbose {
             println!("  Processing file {}/{}: {}",
@@ -576,6 +644,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                 config.expanded_files.len(),
                 file_entry.path.display()
             );
+        } else if let Some(ref pb) = progress {
+            pb.set_message(format!("{}", file_entry.path.file_name().unwrap_or_default().to_string_lossy()));
         }
 
         // Create output filename
@@ -592,6 +662,22 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let mut page = ctx.document.start_page_with(ctx.page_settings());
         let mut surface = page.surface();
         let mut current_y = ctx.margin_top;
+
+        // Check file size before reading
+        const MAX_FILE_SIZE_WARNING: u64 = 100 * 1024 * 1024; // 100MB
+        if let Ok(metadata) = fs::metadata(&file_entry.path) {
+            let file_size = metadata.len();
+            if file_size > MAX_FILE_SIZE_WARNING {
+                warning_manager.warnf(
+                    crate::warnings::WarningCategory::Filesystem,
+                    format!(
+                        "File '{}' is very large ({:.2} MB). Processing may be slow or use significant memory.",
+                        file_entry.path.display(),
+                        file_size as f64 / (1024.0 * 1024.0)
+                    )
+                );
+            }
+        }
 
         // Read file content
         let content = fs::read_to_string(&file_entry.path)
@@ -776,6 +862,16 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         ctx.save(&output_path)?;
 
         println!("✓ Generated: {}", output_path.display());
+
+        // Update progress
+        if let Some(ref pb) = progress {
+            pb.inc(1);
+        }
+    }
+
+    // Finish progress bar
+    if let Some(pb) = progress {
+        pb.finish_and_clear();
     }
 
     Ok(())
