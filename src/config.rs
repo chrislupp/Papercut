@@ -362,6 +362,12 @@ impl Config {
     /// Expand file patterns and populate expanded_files
     fn expand_file_patterns(&mut self) -> Result<()> {
         use crate::file_scanner;
+        use crate::warnings::WarningManager;
+        use std::sync::Arc;
+
+        // Create a disabled warning manager for config loading
+        // (warnings config hasn't been parsed yet)
+        let warning_manager = Arc::new(WarningManager::new(false));
 
         let mut expanded_files = Vec::new();
 
@@ -370,6 +376,7 @@ impl Config {
                 &file_entry.path,
                 &file_entry.include_types,
                 &file_entry.exclude,
+                &warning_manager,
             )?;
 
             // Add each expanded file with the original title (if provided)
@@ -428,6 +435,53 @@ impl Config {
             return Err(PapercutError::InvalidConfig(
                 "Font size must be greater than 0".to_string()
             ));
+        }
+
+        // Validate that content area is positive
+        // Convert margins from cm to points (1 cm = 28.35 points)
+        let margin_top_pt = self.page.margins.top * 28.35;
+        let margin_bottom_pt = self.page.margins.bottom * 28.35;
+        let margin_left_pt = self.page.margins.left * 28.35;
+        let margin_right_pt = self.page.margins.right * 28.35;
+
+        // Get page size in points
+        let (page_width_pt, page_height_pt) = match self.page.size {
+            PageSize::A4 => (595.28, 841.89),      // 210mm x 297mm
+            PageSize::Letter => (612.0, 792.0),     // 8.5" x 11"
+            PageSize::Legal => (612.0, 1008.0),     // 8.5" x 14"
+        };
+
+        // Calculate content area
+        let content_width = page_width_pt - margin_left_pt - margin_right_pt;
+        let content_height = page_height_pt - margin_top_pt - margin_bottom_pt;
+
+        if content_width <= 0.0 {
+            return Err(PapercutError::InvalidConfig(
+                format!(
+                    "Left and right margins ({:.2} cm + {:.2} cm) exceed page width. Content area has no width.",
+                    self.page.margins.left, self.page.margins.right
+                )
+            ));
+        }
+
+        if content_height <= 0.0 {
+            return Err(PapercutError::InvalidConfig(
+                format!(
+                    "Top and bottom margins ({:.2} cm + {:.2} cm) exceed page height. Content area has no height.",
+                    self.page.margins.top, self.page.margins.bottom
+                )
+            ));
+        }
+
+        // Warn if content area is very small (less than 50% of page)
+        let width_ratio = content_width / page_width_pt;
+        let height_ratio = content_height / page_height_pt;
+
+        if width_ratio < 0.5 || height_ratio < 0.5 {
+            eprintln!(
+                "Warning: Margins are very large. Content area is only {:.0}% x {:.0}% of the page.",
+                width_ratio * 100.0, height_ratio * 100.0
+            );
         }
 
         Ok(())

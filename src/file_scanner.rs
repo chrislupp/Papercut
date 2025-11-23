@@ -1,6 +1,8 @@
 use crate::error::{PapercutError, Result};
+use crate::warnings::{WarningManager, WarningCategory};
 use glob::Pattern;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use walkdir::WalkDir;
 
 /// Scan and expand file patterns into actual file paths
@@ -8,6 +10,7 @@ pub fn expand_file_patterns(
     path: &Path,
     include_types: &[String],
     exclude_patterns: &[String],
+    warning_manager: &Arc<WarningManager>,
 ) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
@@ -21,7 +24,7 @@ pub fn expand_file_patterns(
         files.extend(expand_glob_pattern(path_str)?);
     } else if path.is_dir() {
         // Scan directory recursively
-        files.extend(scan_directory(path)?);
+        files.extend(scan_directory(path, warning_manager)?);
     } else if path.is_file() {
         // Single file
         files.push(path.to_path_buf());
@@ -31,7 +34,7 @@ pub fn expand_file_patterns(
 
     // Apply filters
     files = apply_file_type_filter(files, include_types);
-    files = apply_exclusion_patterns(files, exclude_patterns)?;
+    files = apply_exclusion_patterns(files, exclude_patterns, warning_manager)?;
 
     // Sort for consistent output
     files.sort();
@@ -67,16 +70,26 @@ fn expand_glob_pattern(pattern: &str) -> Result<Vec<PathBuf>> {
 }
 
 /// Recursively scan a directory for files
-fn scan_directory(dir: &Path) -> Result<Vec<PathBuf>> {
+fn scan_directory(dir: &Path, warning_manager: &Arc<WarningManager>) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
-    for entry in WalkDir::new(dir)
+    for entry_result in WalkDir::new(dir)
         .follow_links(false)
         .into_iter()
-        .filter_map(|e| e.ok())
     {
-        if entry.file_type().is_file() {
-            files.push(entry.path().to_path_buf());
+        match entry_result {
+            Ok(entry) => {
+                if entry.file_type().is_file() {
+                    files.push(entry.path().to_path_buf());
+                }
+            }
+            Err(e) => {
+                // Warn about directory walking errors (permission denied, broken symlinks, etc.)
+                warning_manager.warnf(
+                    WarningCategory::Filesystem,
+                    format!("Error accessing path during directory scan: {}", e)
+                );
+            }
         }
     }
 
@@ -106,6 +119,7 @@ fn apply_file_type_filter(files: Vec<PathBuf>, include_types: &[String]) -> Vec<
 fn apply_exclusion_patterns(
     files: Vec<PathBuf>,
     exclude_patterns: &[String],
+    warning_manager: &Arc<WarningManager>,
 ) -> Result<Vec<PathBuf>> {
     // If no exclusion patterns, return all files
     if exclude_patterns.is_empty() {
@@ -128,8 +142,21 @@ fn apply_exclusion_patterns(
     let filtered = files
         .into_iter()
         .filter(|path| {
-            let path_str = path.to_str().unwrap_or("");
-            !patterns.iter().any(|pattern| pattern.matches(path_str))
+            match path.to_str() {
+                Some(path_str) => {
+                    // Path is valid UTF-8, check against patterns
+                    !patterns.iter().any(|pattern| pattern.matches(path_str))
+                }
+                None => {
+                    // Warn about non-UTF-8 path
+                    warning_manager.warnf(
+                        WarningCategory::Filesystem,
+                        format!("Skipping file with non-UTF-8 path: {}", path.display())
+                    );
+                    // Exclude non-UTF-8 paths as we can't reliably match them
+                    false
+                }
+            }
         })
         .collect();
 
