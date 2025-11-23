@@ -34,6 +34,10 @@ glob = "0.3"
 walkdir = "2.5"
 dirs = "5.0"
 
+# Progress indicators and terminal detection
+indicatif = "0.17"
+is-terminal = "0.4"
+
 [features]
 default = ["syntax-highlighting"]
 syntax-highlighting = ["syntect"]
