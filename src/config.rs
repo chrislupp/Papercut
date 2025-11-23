@@ -67,7 +67,7 @@ pub struct FileEntry {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SyntaxHighlightingConfig {
-    #[serde(default = "default_false")]
+    #[serde(default = "default_true")]
     pub enabled: bool,
     /// Theme name (e.g., "base16-ocean.dark", "InspiredGitHub")
     #[serde(default = "default_theme")]
@@ -77,7 +77,7 @@ pub struct SyntaxHighlightingConfig {
 impl Default for SyntaxHighlightingConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             theme: default_theme(),
         }
     }
@@ -268,7 +268,7 @@ fn default_true() -> bool {
 }
 
 fn default_theme() -> String {
-    "vscode-dark".to_string()
+    "vscode-light".to_string()
 }
 
 fn default_page_size() -> PageSize {
