@@ -63,7 +63,7 @@ syntax_highlighting:
   # Popular themes: "base16-ocean.dark", "base16-ocean.light",
   #                 "InspiredGitHub", "Solarized (dark)", "Solarized (light)"
   # Run 'papercut --list-themes' to see all available themes
-  theme: base16-ocean.dark
+  theme: vscode-light
 
 # ===== PAGE SETTINGS =====
 page:

@@ -32,7 +32,7 @@ files:
 
 syntax_highlighting:
   enabled: true
-  theme: InspiredGitHub
+  theme: vscode-light
 
 page:
   size: Letter
