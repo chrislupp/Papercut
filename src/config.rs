@@ -97,9 +97,18 @@ pub struct PageConfig {
     /// Show line numbers
     #[serde(default = "default_true")]
     pub line_numbers: bool,
+    /// Show vertical line separator between line numbers and code
+    #[serde(default = "default_true")]
+    pub line_number_separator: bool,
     /// Line spacing multiplier
     #[serde(default = "default_line_spacing")]
     pub line_spacing: f32,
+    /// Enable line wrapping for long lines
+    #[serde(default = "default_true")]
+    pub wrap_long_lines: bool,
+    /// Indentation for wrapped continuation lines (in characters)
+    #[serde(default = "default_wrap_indent")]
+    pub wrap_indent: usize,
 }
 
 impl Default for PageConfig {
@@ -109,7 +118,10 @@ impl Default for PageConfig {
             margins: MarginsConfig::default(),
             font_size: default_font_size(),
             line_numbers: true,
+            line_number_separator: true,
             line_spacing: default_line_spacing(),
+            wrap_long_lines: true,
+            wrap_indent: default_wrap_indent(),
         }
     }
 }
@@ -252,7 +264,7 @@ fn default_true() -> bool {
 }
 
 fn default_theme() -> String {
-    "base16-ocean.dark".to_string()
+    "vscode-dark".to_string()
 }
 
 fn default_page_size() -> PageSize {
@@ -265,6 +277,10 @@ fn default_font_size() -> u8 {
 
 fn default_line_spacing() -> f32 {
     1.2
+}
+
+fn default_wrap_indent() -> usize {
+    4
 }
 
 fn default_margin_top() -> f32 {
