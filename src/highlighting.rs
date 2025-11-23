@@ -1,8 +1,11 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use syntect::easy::HighlightLines;
-use syntect::highlighting::{ThemeSet, Style, Color};
+use syntect::highlighting::{ThemeSet, Style, Color, Theme};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
+use crate::pdf::themes::ThemePreset;
+use std::fs;
+use std::io::Cursor;
 
 /// Represents a styled text segment
 #[derive(Debug, Clone)]
@@ -15,13 +18,40 @@ pub struct StyledSegment {
     pub underline: bool,
 }
 
+/// Try to load a custom theme from .papercut folders
+/// Search order: ./.papercut/themes/ → ~/.papercut/themes/
+fn load_custom_theme(theme_name: &str) -> Option<Theme> {
+    // Try project-level .papercut folder first
+    let project_theme_path = PathBuf::from("./.papercut/themes").join(format!("{}.tmTheme", theme_name));
+    if project_theme_path.exists() {
+        if let Ok(theme_data) = fs::read_to_string(&project_theme_path) {
+            let mut cursor = Cursor::new(theme_data.as_bytes());
+            if let Ok(theme) = ThemeSet::load_from_reader(&mut cursor) {
+                return Some(theme);
+            }
+        }
+    }
+
+    // Try user home .papercut folder
+    if let Some(home_dir) = dirs::home_dir() {
+        let home_theme_path = home_dir.join(".papercut/themes").join(format!("{}.tmTheme", theme_name));
+        if home_theme_path.exists() {
+            if let Ok(theme_data) = fs::read_to_string(&home_theme_path) {
+                let mut cursor = Cursor::new(theme_data.as_bytes());
+                if let Ok(theme) = ThemeSet::load_from_reader(&mut cursor) {
+                    return Some(theme);
+                }
+            }
+        }
+    }
+
+    None
+}
+
 /// Highlight code and return styled segments for PDF rendering
 pub fn highlight_code_styled(code: &str, file_path: &Path, theme_name: &str) -> Result<Vec<Vec<StyledSegment>>, String> {
     // Load syntax set
     let ss = SyntaxSet::load_defaults_newlines();
-
-    // Load theme set
-    let ts = ThemeSet::load_defaults();
 
     // Get the syntax definition based on file extension
     let syntax = ss
@@ -29,12 +59,24 @@ pub fn highlight_code_styled(code: &str, file_path: &Path, theme_name: &str) -> 
         .map_err(|e| format!("Failed to determine syntax: {}", e))?
         .unwrap_or_else(|| ss.find_syntax_plain_text());
 
-    // Get the theme
-    let theme = ts.themes.get(theme_name)
-        .ok_or_else(|| format!("Theme '{}' not found", theme_name))?;
+    // Theme loading order: built-in presets → custom .papercut themes → syntect defaults
+    let theme = if let Some(preset) = ThemePreset::from_str(theme_name) {
+        // 1. Use built-in theme preset
+        preset.load_theme()
+            .ok_or_else(|| format!("Failed to load built-in theme preset '{}'", theme_name))?
+    } else if let Some(custom_theme) = load_custom_theme(theme_name) {
+        // 2. Use custom theme from .papercut folders
+        custom_theme
+    } else {
+        // 3. Fall back to syntect's default themes by name
+        let ts = ThemeSet::load_defaults();
+        ts.themes.get(theme_name)
+            .ok_or_else(|| format!("Theme '{}' not found in built-in presets, .papercut folders, or syntect defaults", theme_name))?
+            .clone()
+    };
 
     // Highlight the code line by line
-    let mut h = HighlightLines::new(syntax, theme);
+    let mut h = HighlightLines::new(syntax, &theme);
     let mut lines = Vec::new();
 
     for line in LinesWithEndings::from(code) {
@@ -63,21 +105,30 @@ pub fn highlight_code(code: &str, file_path: &Path, theme_name: &str) -> Result<
     // Load syntax set
     let ss = SyntaxSet::load_defaults_newlines();
 
-    // Load theme set
-    let ts = ThemeSet::load_defaults();
-
     // Get the syntax definition based on file extension
     let syntax = ss
         .find_syntax_for_file(file_path)
         .map_err(|e| format!("Failed to determine syntax: {}", e))?
         .unwrap_or_else(|| ss.find_syntax_plain_text());
 
-    // Get the theme
-    let theme = ts.themes.get(theme_name)
-        .ok_or_else(|| format!("Theme '{}' not found", theme_name))?;
+    // Theme loading order: built-in presets → custom .papercut themes → syntect defaults
+    let theme = if let Some(preset) = ThemePreset::from_str(theme_name) {
+        // 1. Use built-in theme preset
+        preset.load_theme()
+            .ok_or_else(|| format!("Failed to load built-in theme preset '{}'", theme_name))?
+    } else if let Some(custom_theme) = load_custom_theme(theme_name) {
+        // 2. Use custom theme from .papercut folders
+        custom_theme
+    } else {
+        // 3. Fall back to syntect's default themes by name
+        let ts = ThemeSet::load_defaults();
+        ts.themes.get(theme_name)
+            .ok_or_else(|| format!("Theme '{}' not found in built-in presets, .papercut folders, or syntect defaults", theme_name))?
+            .clone()
+    };
 
     // Highlight the code
-    let mut h = HighlightLines::new(syntax, theme);
+    let mut h = HighlightLines::new(syntax, &theme);
     let mut result = String::new();
 
     for line in LinesWithEndings::from(code) {
