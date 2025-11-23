@@ -1,4 +1,4 @@
-use syntect::highlighting::{Theme, ThemeSet, ThemeSettings, Color, StyleModifier, FontStyle, ScopeSelectors};
+use syntect::highlighting::{Theme, ThemeSet, ThemeSettings, Color, StyleModifier, ScopeSelectors};
 use std::str::FromStr;
 
 /// Built-in theme presets
@@ -66,7 +66,7 @@ fn create_vscode_light_modern_theme() -> Theme {
     let items = vec![
         // Comments - green
         ThemeItem {
-            scope: ScopeSelectors::from_str("comment").unwrap(),
+            scope: ScopeSelectors::from_str("comment").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x80, b: 0x00, a: 0xFF }),
                 ..Default::default()
@@ -74,7 +74,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // Strings - red/maroon
         ThemeItem {
-            scope: ScopeSelectors::from_str("string").unwrap(),
+            scope: ScopeSelectors::from_str("string").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0xA3, g: 0x15, b: 0x15, a: 0xFF }),
                 ..Default::default()
@@ -82,7 +82,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // Numbers - teal
         ThemeItem {
-            scope: ScopeSelectors::from_str("constant.numeric").unwrap(),
+            scope: ScopeSelectors::from_str("constant.numeric").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x09, g: 0x88, b: 0x5A, a: 0xFF }),
                 ..Default::default()
@@ -90,7 +90,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // Functions - brown/gold
         ThemeItem {
-            scope: ScopeSelectors::from_str("entity.name.function, support.function").unwrap(),
+            scope: ScopeSelectors::from_str("entity.name.function, support.function").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x79, g: 0x5E, b: 0x26, a: 0xFF }),
                 ..Default::default()
@@ -98,7 +98,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // Types - teal
         ThemeItem {
-            scope: ScopeSelectors::from_str("support.class, support.type, entity.name.type, storage.type").unwrap(),
+            scope: ScopeSelectors::from_str("support.class, support.type, entity.name.type, storage.type").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x26, g: 0x7F, b: 0x99, a: 0xFF }),
                 ..Default::default()
@@ -106,7 +106,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // Control keywords - blue
         ThemeItem {
-            scope: ScopeSelectors::from_str("keyword.control").unwrap(),
+            scope: ScopeSelectors::from_str("keyword.control").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
                 ..Default::default()
@@ -114,7 +114,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // Variables - dark blue
         ThemeItem {
-            scope: ScopeSelectors::from_str("variable, entity.name.variable").unwrap(),
+            scope: ScopeSelectors::from_str("variable, entity.name.variable").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x10, b: 0x80, a: 0xFF }),
                 ..Default::default()
@@ -122,7 +122,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // Keywords (general) - blue
         ThemeItem {
-            scope: ScopeSelectors::from_str("keyword, storage, storage.modifier").unwrap(),
+            scope: ScopeSelectors::from_str("keyword, storage, storage.modifier").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
                 ..Default::default()
@@ -130,7 +130,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // keyword.operator - black
         ThemeItem {
-            scope: ScopeSelectors::from_str("keyword.operator").unwrap(),
+            scope: ScopeSelectors::from_str("keyword.operator").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x00, b: 0x00, a: 0xFF }),
                 ..Default::default()
@@ -138,7 +138,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // constant.language - blue
         ThemeItem {
-            scope: ScopeSelectors::from_str("constant.language").unwrap(),
+            scope: ScopeSelectors::from_str("constant.language").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
                 ..Default::default()
@@ -146,7 +146,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // constant.character - blue
         ThemeItem {
-            scope: ScopeSelectors::from_str("constant.character").unwrap(),
+            scope: ScopeSelectors::from_str("constant.character").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
                 ..Default::default()
@@ -154,7 +154,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // variable.language - blue
         ThemeItem {
-            scope: ScopeSelectors::from_str("variable.language").unwrap(),
+            scope: ScopeSelectors::from_str("variable.language").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
                 ..Default::default()
@@ -162,7 +162,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // entity.name.tag - maroon
         ThemeItem {
-            scope: ScopeSelectors::from_str("entity.name.tag").unwrap(),
+            scope: ScopeSelectors::from_str("entity.name.tag").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x80, g: 0x00, b: 0x00, a: 0xFF }),
                 ..Default::default()
@@ -170,7 +170,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // entity.other.attribute-name - red
         ThemeItem {
-            scope: ScopeSelectors::from_str("entity.other.attribute-name").unwrap(),
+            scope: ScopeSelectors::from_str("entity.other.attribute-name").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0xFF, g: 0x00, b: 0x00, a: 0xFF }),
                 ..Default::default()
@@ -178,7 +178,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // meta.preprocessor - blue
         ThemeItem {
-            scope: ScopeSelectors::from_str("meta.preprocessor").unwrap(),
+            scope: ScopeSelectors::from_str("meta.preprocessor").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0x00, g: 0x00, b: 0xFF, a: 0xFF }),
                 ..Default::default()
@@ -186,7 +186,7 @@ fn create_vscode_light_modern_theme() -> Theme {
         },
         // invalid - red
         ThemeItem {
-            scope: ScopeSelectors::from_str("invalid").unwrap(),
+            scope: ScopeSelectors::from_str("invalid").expect("Built-in theme scope selector should be valid"),
             style: StyleModifier {
                 foreground: Some(Color { r: 0xCD, g: 0x31, b: 0x31, a: 0xFF }),
                 ..Default::default()

@@ -2,11 +2,15 @@ use crate::config::{Config, OutputMode};
 use crate::error::{PapercutError, Result};
 use crate::pdf::krilla_doc::PdfContext;
 use crate::pdf::colors::{rgb_to_paint, syntect_to_paint};
+use crate::warnings::WarningManager;
 use krilla::geom::{PathBuilder, Point};
 use krilla::num::NormalizedF32;
 use krilla::paint::{Fill, Stroke};
 use krilla::text::TextDirection;
 use std::fs;
+use std::io::{self, Write};
+use std::path::Path;
+use std::sync::Arc;
 
 #[cfg(feature = "syntax-highlighting")]
 use crate::highlighting;
@@ -97,23 +101,58 @@ fn wrap_styled_line(
     wrapped_lines
 }
 
+/// Check if we should proceed with writing to a file that already exists
+/// Returns Ok(true) if we should proceed, Ok(false) if we should skip, or Err on failure
+fn should_overwrite_file(path: &Path, force: bool) -> Result<bool> {
+    if !path.exists() {
+        return Ok(true);
+    }
+
+    if force {
+        return Ok(true);
+    }
+
+    // Check if stdout is a TTY (interactive terminal)
+    if !is_terminal::IsTerminal::is_terminal(&io::stdout()) {
+        return Err(PapercutError::InvalidConfig(
+            format!(
+                "File '{}' already exists. Use --force to overwrite files in non-interactive mode.",
+                path.display()
+            )
+        ));
+    }
+
+    // Interactive mode: prompt user
+    print!("File '{}' already exists. Overwrite? [y/N]: ", path.display());
+    io::stdout()
+        .flush()
+        .map_err(|e| PapercutError::Io(e))?;
+
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .map_err(|e| PapercutError::Io(e))?;
+
+    Ok(input.trim().eq_ignore_ascii_case("y"))
+}
+
 /// Main entry point for PDF generation
-pub fn generate(config: Config, verbose: bool) -> Result<()> {
+pub fn generate(config: Config, verbose: bool, force: bool, warning_manager: Arc<WarningManager>) -> Result<()> {
     match config.output.mode {
-        OutputMode::Single => generate_single_pdf(config, verbose),
-        OutputMode::Multiple => generate_multiple_pdfs(config, verbose),
+        OutputMode::Single => generate_single_pdf(config, verbose, force, warning_manager),
+        OutputMode::Multiple => generate_multiple_pdfs(config, verbose, force, warning_manager),
     }
 }
 
 /// Generate a single PDF containing all files
-fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
+fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manager: Arc<WarningManager>) -> Result<()> {
     if verbose {
         println!("Generating single PDF with {} files", config.expanded_files.len());
     }
 
     let output_path = config.output.directory.join(&config.output.filename);
 
-    let mut ctx = PdfContext::new(config.clone())?;
+    let mut ctx = PdfContext::new(config.clone(), Arc::clone(&warning_manager))?;
     let font = ctx.font_manager.get_monospace_font()?;
 
     // Start first page
@@ -150,7 +189,10 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
 
         // Read file content
         let content = fs::read_to_string(&file_entry.path)
-            .map_err(|e| PapercutError::Io(e))?;
+            .map_err(|e| PapercutError::FileRead {
+                path: file_entry.path.display().to_string(),
+                source: e,
+            })?;
 
         // Get file title
         let default_title = file_entry.path.file_name()
@@ -508,17 +550,10 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
         println!("Rendering PDF to: {}", output_path.display());
     }
 
-    // Check if file exists and prompt user
-    if output_path.exists() {
-        print!("File '{}' already exists. Overwrite? [y/N]: ", output_path.display());
-        use std::io::{self, Write};
-        io::stdout().flush().unwrap();
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-        if !input.trim().eq_ignore_ascii_case("y") {
-            println!("Skipping file.");
-            return Ok(());
-        }
+    // Check if file exists and prompt user (or fail if non-interactive)
+    if !should_overwrite_file(&output_path, force)? {
+        println!("Skipping file.");
+        return Ok(());
     }
 
     ctx.save(&output_path)?;
@@ -529,7 +564,7 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
 }
 
 /// Generate multiple PDFs, one per file
-fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
+fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_manager: Arc<WarningManager>) -> Result<()> {
     if verbose {
         println!("Generating {} separate PDFs", config.expanded_files.len());
     }
@@ -550,7 +585,7 @@ fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
             .unwrap_or("output");
         let output_path = config.output.directory.join(format!("{}.pdf", output_filename));
 
-        let mut ctx = PdfContext::new(config.clone())?;
+        let mut ctx = PdfContext::new(config.clone(), Arc::clone(&warning_manager))?;
         let font = ctx.font_manager.get_monospace_font()?;
 
         // Start page
@@ -560,7 +595,10 @@ fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
 
         // Read file content
         let content = fs::read_to_string(&file_entry.path)
-            .map_err(|e| PapercutError::Io(e))?;
+            .map_err(|e| PapercutError::FileRead {
+                path: file_entry.path.display().to_string(),
+                source: e,
+            })?;
 
         // Render code (simplified)
         let lines: Vec<&str> = content.lines().collect();
@@ -727,6 +765,12 @@ fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
         // Finish page
         surface.finish();
         page.finish();
+
+        // Check if file exists and prompt user (or fail if non-interactive)
+        if !should_overwrite_file(&output_path, force)? {
+            println!("Skipping file: {}", output_path.display());
+            continue;
+        }
 
         // Save
         ctx.save(&output_path)?;
