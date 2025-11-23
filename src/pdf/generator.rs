@@ -221,13 +221,30 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
         };
         let code_x = ctx.margin_left + line_num_width;
 
-        // Draw vertical separator line between line numbers and code (if enabled)
-        let separator_x_pos = if config.page.line_numbers && config.page.line_number_separator {
-            Some(ctx.margin_left + line_num_width - (font_size * 0.5))
-        } else {
-            None
+        // Calculate vertical line positions (left border, middle separator, right border)
+        let vertical_lines: Vec<(f32, (u8, u8, u8), f32)> = {
+            let mut lines = Vec::new();
+
+            // Left border (at left edge of line numbers)
+            if config.page.vertical_borders {
+                lines.push((ctx.margin_left, (0, 0, 0), 0.5));
+            }
+
+            // Middle separator (between line numbers and code)
+            if config.page.line_numbers && config.page.line_number_separator {
+                let sep_x = ctx.margin_left + line_num_width - (font_size * 0.5);
+                lines.push((sep_x, (0, 0, 0), 0.3));
+            }
+
+            // Right border (at right edge of content)
+            if config.page.vertical_borders {
+                let right_x = ctx.margin_left + ctx.content_width;
+                lines.push((right_x, (0, 0, 0), 0.5));
+            }
+
+            lines
         };
-        let separator_start_y = current_y;
+        let mut page_segment_start_y = current_y;
 
         // Try syntax highlighting if enabled
         #[cfg(feature = "syntax-highlighting")]
@@ -310,11 +327,28 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
 
                     // Check if we need a new page
                     if current_y + line_height > ctx.page_height_mm - ctx.margin_bottom {
+                        // Draw vertical lines for current page segment before finishing
+                        for (line_x, color, width) in &vertical_lines {
+                            let mut path_builder = PathBuilder::new();
+                            path_builder.move_to(*line_x, page_segment_start_y);
+                            path_builder.line_to(*line_x, current_y);
+                            if let Some(path) = path_builder.finish() {
+                                surface.set_stroke(Some(Stroke {
+                                    paint: rgb_to_paint(color.0, color.1, color.2),
+                                    width: *width,
+                                    ..Default::default()
+                                }));
+                                surface.draw_path(&path);
+                                surface.set_stroke(None);
+                            }
+                        }
+
                         surface.finish();
                         page.finish();
                         page = ctx.document.start_page_with(ctx.page_settings());
                         surface = page.surface();
                         current_y = ctx.margin_top;
+                        page_segment_start_y = ctx.margin_top;
                     }
                 }
             }
@@ -404,29 +438,45 @@ fn generate_single_pdf(config: Config, verbose: bool) -> Result<()> {
 
                     // Check if we need a new page
                     if current_y + line_height > ctx.page_height_mm - ctx.margin_bottom {
+                        // Draw vertical lines for current page segment before finishing
+                        for (line_x, color, width) in &vertical_lines {
+                            let mut path_builder = PathBuilder::new();
+                            path_builder.move_to(*line_x, page_segment_start_y);
+                            path_builder.line_to(*line_x, current_y);
+                            if let Some(path) = path_builder.finish() {
+                                surface.set_stroke(Some(Stroke {
+                                    paint: rgb_to_paint(color.0, color.1, color.2),
+                                    width: *width,
+                                    ..Default::default()
+                                }));
+                                surface.draw_path(&path);
+                                surface.set_stroke(None);
+                            }
+                        }
+
                         surface.finish();
                         page.finish();
                         page = ctx.document.start_page_with(ctx.page_settings());
                         surface = page.surface();
                         current_y = ctx.margin_top;
+                        page_segment_start_y = ctx.margin_top;
                     }
                 }
             }
         }
 
-        // Draw vertical separator line between line numbers and code
-        if let Some(sep_x) = separator_x_pos {
-            let separator_end_y = current_y;
+        // Draw all vertical lines for the final page segment
+        for (line_x, color, width) in &vertical_lines {
             let mut path_builder = PathBuilder::new();
-            path_builder.move_to(sep_x, separator_start_y);
-            path_builder.line_to(sep_x, separator_end_y);
-            if let Some(separator_path) = path_builder.finish() {
+            path_builder.move_to(*line_x, page_segment_start_y);
+            path_builder.line_to(*line_x, current_y);
+            if let Some(path) = path_builder.finish() {
                 surface.set_stroke(Some(Stroke {
-                    paint: rgb_to_paint(200, 200, 200),
-                    width: 0.3,
+                    paint: rgb_to_paint(color.0, color.1, color.2),
+                    width: *width,
                     ..Default::default()
                 }));
-                surface.draw_path(&separator_path);
+                surface.draw_path(&path);
                 surface.set_stroke(None);
             }
         }
@@ -514,15 +564,32 @@ fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
         let char_width = font_size * 0.6; // Monospace approximation
         let max_chars = (available_width / char_width).floor() as usize;
 
-        // Draw vertical separator line between line numbers and code (if enabled)
-        let separator_x_pos = if config.page.line_numbers && config.page.line_number_separator {
-            Some(ctx.margin_left + line_num_width - (font_size * 0.5))
-        } else {
-            None
-        };
-        let separator_start_y = current_y;
-
         let code_x = ctx.margin_left + line_num_width;
+
+        // Calculate vertical line positions (left border, middle separator, right border)
+        let vertical_lines: Vec<(f32, (u8, u8, u8), f32)> = {
+            let mut lines = Vec::new();
+
+            // Left border (at left edge of line numbers)
+            if config.page.vertical_borders {
+                lines.push((ctx.margin_left, (0, 0, 0), 0.5));
+            }
+
+            // Middle separator (between line numbers and code)
+            if config.page.line_numbers && config.page.line_number_separator {
+                let sep_x = ctx.margin_left + line_num_width - (font_size * 0.5);
+                lines.push((sep_x, (0, 0, 0), 0.3));
+            }
+
+            // Right border (at right edge of content)
+            if config.page.vertical_borders {
+                let right_x = ctx.margin_left + ctx.content_width;
+                lines.push((right_x, (0, 0, 0), 0.5));
+            }
+
+            lines
+        };
+        let mut page_segment_start_y = current_y;
 
         for (source_line_num, line) in lines.iter().enumerate() {
             // Wrap or truncate the line
@@ -602,28 +669,44 @@ fn generate_multiple_pdfs(config: Config, verbose: bool) -> Result<()> {
                 current_y += line_height;
 
                 if current_y + line_height > ctx.page_height_mm - ctx.margin_bottom {
+                    // Draw vertical lines for current page segment before finishing
+                    for (line_x, color, width) in &vertical_lines {
+                        let mut path_builder = PathBuilder::new();
+                        path_builder.move_to(*line_x, page_segment_start_y);
+                        path_builder.line_to(*line_x, current_y);
+                        if let Some(path) = path_builder.finish() {
+                            surface.set_stroke(Some(Stroke {
+                                paint: rgb_to_paint(color.0, color.1, color.2),
+                                width: *width,
+                                ..Default::default()
+                            }));
+                            surface.draw_path(&path);
+                            surface.set_stroke(None);
+                        }
+                    }
+
                     surface.finish();
                     page.finish();
                     page = ctx.document.start_page_with(ctx.page_settings());
                     surface = page.surface();
                     current_y = ctx.margin_top;
+                    page_segment_start_y = ctx.margin_top;
                 }
             }
         }
 
-        // Draw vertical separator line between line numbers and code
-        if let Some(sep_x) = separator_x_pos {
-            let separator_end_y = current_y;
+        // Draw all vertical lines for the final page segment
+        for (line_x, color, width) in &vertical_lines {
             let mut path_builder = PathBuilder::new();
-            path_builder.move_to(sep_x, separator_start_y);
-            path_builder.line_to(sep_x, separator_end_y);
-            if let Some(separator_path) = path_builder.finish() {
+            path_builder.move_to(*line_x, page_segment_start_y);
+            path_builder.line_to(*line_x, current_y);
+            if let Some(path) = path_builder.finish() {
                 surface.set_stroke(Some(Stroke {
-                    paint: rgb_to_paint(200, 200, 200),
-                    width: 0.3,
+                    paint: rgb_to_paint(color.0, color.1, color.2),
+                    width: *width,
                     ..Default::default()
                 }));
-                surface.draw_path(&separator_path);
+                surface.draw_path(&path);
                 surface.set_stroke(None);
             }
         }

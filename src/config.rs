@@ -100,6 +100,9 @@ pub struct PageConfig {
     /// Show vertical line separator between line numbers and code
     #[serde(default = "default_true")]
     pub line_number_separator: bool,
+    /// Show vertical borders at left and right edges of content
+    #[serde(default = "default_true")]
+    pub vertical_borders: bool,
     /// Line spacing multiplier
     #[serde(default = "default_line_spacing")]
     pub line_spacing: f32,
@@ -119,6 +122,7 @@ impl Default for PageConfig {
             font_size: default_font_size(),
             line_numbers: true,
             line_number_separator: true,
+            vertical_borders: true,
             line_spacing: default_line_spacing(),
             wrap_long_lines: true,
             wrap_indent: default_wrap_indent(),
