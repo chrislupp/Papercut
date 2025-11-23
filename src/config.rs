@@ -21,6 +21,8 @@ pub struct Config {
     pub styling: StylingConfig,
     #[serde(default)]
     pub metadata: MetadataConfig,
+    #[serde(default)]
+    pub warnings: WarningsConfig,
 }
 
 /// Expanded file entry after pattern matching
@@ -246,6 +248,25 @@ impl Default for MetadataConfig {
             author: String::new(),
             subject: String::new(),
             keywords: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct WarningsConfig {
+    /// Enable or disable all warnings
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// List of warning categories to silence: fonts, themes, highlighting, filesystem
+    #[serde(default)]
+    pub silence_categories: Vec<String>,
+}
+
+impl Default for WarningsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            silence_categories: Vec::new(),
         }
     }
 }

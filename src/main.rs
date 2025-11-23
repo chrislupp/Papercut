@@ -2,14 +2,17 @@ mod config;
 mod error;
 mod file_scanner;
 mod pdf;
+mod warnings;
 
 #[cfg(feature = "syntax-highlighting")]
 mod highlighting;
 
 use clap::Parser;
 use std::path::PathBuf;
+use std::sync::Arc;
 use config::Config;
 use error::Result;
+use warnings::{WarningManager, WarningCategory};
 
 /// Convert source code files to PDF with configurable headers and footers
 #[derive(Parser, Debug)]
@@ -28,6 +31,14 @@ struct Args {
     /// Verbose output
     #[arg(short, long)]
     verbose: bool,
+
+    /// Suppress all warnings
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// Skip interactive prompts and overwrite files without asking
+    #[arg(short, long)]
+    force: bool,
 
     /// List available syntax highlighting themes (requires syntax-highlighting feature)
     #[cfg(feature = "syntax-highlighting")]
@@ -58,6 +69,19 @@ fn main() -> Result<()> {
         println!("Files matched: {}", config.expanded_files.len());
     }
 
+    // Set up warning manager
+    let warnings_enabled = config.warnings.enabled && !args.quiet;
+    let warning_manager = Arc::new(WarningManager::new(warnings_enabled));
+
+    // Configure warning categories based on config
+    for category_str in &config.warnings.silence_categories {
+        if let Some(category) = WarningCategory::from_str(category_str) {
+            warning_manager.silence_category(category);
+        } else if args.verbose {
+            eprintln!("Warning: Unknown warning category '{}' in config", category_str);
+        }
+    }
+
     // Create output directory if it doesn't exist
     std::fs::create_dir_all(&config.output.directory)?;
 
@@ -66,7 +90,7 @@ fn main() -> Result<()> {
     }
 
     // Generate PDF(s)
-    pdf::generate(config, args.verbose)?;
+    pdf::generate(config, args.verbose, args.force, warning_manager)?;
 
     if args.verbose {
         println!("PDF generation completed successfully!");
