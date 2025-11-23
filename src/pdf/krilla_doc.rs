@@ -1,9 +1,11 @@
 use crate::config::{Config, PageSize};
 use crate::error::{PapercutError, Result};
 use crate::pdf::fonts::FontManager;
+use crate::warnings::WarningManager;
 use krilla::Document;
 use krilla::page::PageSettings;
 use std::path::Path;
+use std::sync::Arc;
 
 /// Simplified wrapper - krilla 0.5 manages pages differently
 /// We'll just provide helper functions and let the generator manage pages directly
@@ -23,9 +25,9 @@ pub struct PdfContext {
 
 impl PdfContext {
     /// Create a new PDF context
-    pub fn new(config: Config) -> Result<Self> {
+    pub fn new(config: Config, warning_manager: Arc<WarningManager>) -> Result<Self> {
         let document = Document::new();
-        let mut font_manager = FontManager::new();
+        let mut font_manager = FontManager::new(warning_manager);
 
         // Pre-load the monospace font
         font_manager.get_monospace_font()?;
@@ -69,11 +71,15 @@ impl PdfContext {
         // Finish and get PDF bytes
         let pdf_bytes = self.document
             .finish()
-            .map_err(|_| PapercutError::PdfGeneration("Failed to finish PDF document".to_string()))?;
+            .map_err(|e| PapercutError::PdfGeneration(
+                format!("Failed to finish PDF document: {:?}", e)
+            ))?;
 
         // Write to file
         std::fs::write(path, pdf_bytes)
-            .map_err(|e| PapercutError::Io(e))?;
+            .map_err(|e| PapercutError::PdfGeneration(
+                format!("Failed to write PDF to '{}': {}", path.display(), e)
+            ))?;
 
         Ok(())
     }
