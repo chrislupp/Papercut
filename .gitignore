@@ -23,6 +23,10 @@ target
 # Generated PDF output files
 output/
 releases/
+dist/
+
+# macOS packaging build artifacts
+packaging/macos/build/
 
 # Backup files from development
 **/*_old.rs
