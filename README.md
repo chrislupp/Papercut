@@ -6,6 +6,21 @@ Convert source code files to PDF with configurable headers, footers, and formatt
 
 ### Installation
 
+#### macOS (DMG Installer)
+
+1. Download the latest `Papercut-X.X.X.dmg` from the [releases page](https://github.com/yourusername/papercut/releases)
+2. Open the DMG and drag `Papercut.app` to your Applications folder
+3. (Optional) Double-click `Install CLI Tool` to add `papercut` to your PATH
+4. Run from terminal:
+
+```bash
+papercut --config config.yaml
+```
+
+To uninstall: Delete Papercut.app and run `sudo rm /usr/local/bin/papercut`
+
+#### Build from Source
+
 ```bash
 git clone https://github.com/yourusername/papercut.git
 cd papercut
@@ -112,6 +127,53 @@ warnings:
 
 **CLI Override:**
 Use `--quiet` to suppress all warnings regardless of config settings.
+
+## Building for Distribution
+
+### macOS DMG Installer
+
+To build a macOS DMG installer:
+
+```bash
+# 1. Build the app bundle
+cd packaging/macos
+./build-macos.sh
+
+# 2. Create the DMG (requires create-dmg)
+brew install create-dmg
+./create-dmg.sh
+```
+
+The DMG will be created in the `dist/` directory.
+
+**What's included:**
+- `Papercut.app` - Application bundle containing the CLI tool
+- `Install CLI Tool.app` - Helper to add `papercut` to PATH
+
+**Optional: Code Signing and Notarization**
+
+For distribution outside the App Store, you should sign and notarize the app:
+
+```bash
+# Sign the app
+codesign --force --options=runtime \
+  --sign "Developer ID Application: Your Name (TEAM_ID)" \
+  --timestamp packaging/macos/build/Papercut.app
+
+# Sign the DMG
+codesign --sign "Developer ID Application: Your Name" \
+  dist/Papercut-X.X.X.dmg
+
+# Notarize (requires Apple Developer account)
+xcrun notarytool submit dist/Papercut-X.X.X.dmg \
+  --apple-id "your@email.com" \
+  --team-id "TEAM_ID" \
+  --password "app-specific-password" \
+  --wait
+
+# Staple the notarization ticket
+xcrun stapler staple dist/Papercut-X.X.X.dmg
+```
 
 ## License
 
