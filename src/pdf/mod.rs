@@ -1,5 +1,6 @@
 mod colors;
 mod code_block;
+mod cover_page;
 mod fonts;
 mod generator;
 mod krilla_doc;

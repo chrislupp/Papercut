@@ -2,6 +2,7 @@ use crate::config::{Config, OutputMode};
 use crate::error::{PapercutError, Result};
 use crate::pdf::krilla_doc::PdfContext;
 use crate::pdf::colors::{rgb_to_paint, syntect_to_paint};
+use crate::pdf::cover_page;
 use crate::warnings::WarningManager;
 use indicatif::{ProgressBar, ProgressStyle};
 use krilla::geom::{PathBuilder, Point};
@@ -176,6 +177,27 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         );
 
         current_y += 25.0;
+    }
+
+    // Render cover page if enabled
+    if config.cover_page.enabled {
+        cover_page::render_cover_page(
+            &mut ctx.font_manager,
+            &config,
+            &mut surface,
+            ctx.margin_left,
+            ctx.margin_top,
+            ctx.content_width,
+            ctx.content_height,
+        )?;
+
+        // Finish cover page and start a new page for content
+        surface.finish();
+        page.finish();
+
+        page = ctx.document.start_page_with(ctx.page_settings());
+        surface = page.surface();
+        current_y = ctx.margin_top;
     }
 
     // Create progress bar if processing multiple files and not in verbose mode
@@ -662,6 +684,27 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let mut page = ctx.document.start_page_with(ctx.page_settings());
         let mut surface = page.surface();
         let mut current_y = ctx.margin_top;
+
+        // Render cover page if enabled
+        if config.cover_page.enabled {
+            cover_page::render_cover_page(
+                &mut ctx.font_manager,
+                &config,
+                &mut surface,
+                ctx.margin_left,
+                ctx.margin_top,
+                ctx.content_width,
+                ctx.content_height,
+            )?;
+
+            // Finish cover page and start a new page for content
+            surface.finish();
+            page.finish();
+
+            page = ctx.document.start_page_with(ctx.page_settings());
+            surface = page.surface();
+            current_y = ctx.margin_top;
+        }
 
         // Check file size before reading
         const MAX_FILE_SIZE_WARNING: u64 = 100 * 1024 * 1024; // 100MB
