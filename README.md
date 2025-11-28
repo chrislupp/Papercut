@@ -50,6 +50,7 @@ papercut --config config.yaml
 
 ### Features
 
+- **Cover Pages**: Optional cover page with title, description, location, date, and table of contents
 - **Directory Scanning & Glob Patterns**: Use wildcards (`*.rs`, `src/**/*.py`) and scan entire directories
 - **File Filtering**: Include/exclude specific file types and patterns
 - **Single or Multiple PDFs**: Combine all files or create separate PDFs

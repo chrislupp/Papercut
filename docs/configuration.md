@@ -14,6 +14,7 @@ The configuration file is organized into the following sections:
 - `footer` - Footer configuration
 - `styling` - Visual styling options
 - `metadata` - PDF metadata
+- `cover_page` - Cover page configuration
 
 ## Output Configuration
 
@@ -283,6 +284,105 @@ metadata:
 - **subject** (optional): PDF document subject
 
 - **keywords** (optional): List of keywords for searchability
+
+## Cover Page Configuration
+
+Controls the optional cover page that appears before the printed code.
+
+```yaml
+cover_page:
+  enabled: true
+  title: "Project Source Code"
+  description: "Complete source code listing for the project review."
+  location: "https://github.com/user/project"
+  date: ""                    # Empty = auto-generate current date
+  include_toc: true           # Table of contents
+  title_font_size: 24
+  text_font_size: 12
+```
+
+### Fields
+
+- **enabled** (optional, default: `false`): Enable the cover page
+  - When `true`, a cover page will be added before the code content
+  - Works in both single and multiple PDF modes
+  - Each PDF gets its own cover page in multiple mode
+
+- **title** (optional): Main title displayed on the cover page
+  - Displayed prominently at the top of the cover page
+  - If empty, no title is shown
+  - Uses the `title_font_size` setting
+
+- **description** (optional): Descriptive text about the code
+  - Can be multiple lines (use YAML multiline syntax)
+  - Automatically wraps to fit the page width
+  - Displayed below the title
+
+- **location** (optional): URL or location where the code is kept
+  - Typically a GitHub URL, Git repository, or file path
+  - Displayed as "Location: [value]"
+  - Useful for referencing the source of the code
+
+- **date** (optional): Date to display on the cover page
+  - If empty, automatically generates current date (YYYY-MM-DD format)
+  - Can be any custom date string
+  - Displayed as "Date: [value]"
+
+- **include_toc** (optional, default: `true`): Include table of contents
+  - Lists all files that will be printed
+  - Shows up to 30 files with a "...and X more" message if needed
+  - Numbered list format
+  - Only shown if cover page is enabled
+
+- **title_font_size** (optional, default: `24`): Font size for the title in points
+
+- **text_font_size** (optional, default: `12`): Font size for description and other text in points
+
+### Examples
+
+**Example 1: Simple cover page with auto-generated date**
+```yaml
+cover_page:
+  enabled: true
+  title: "My Project"
+  description: "Source code documentation"
+  location: "https://github.com/user/myproject"
+```
+
+**Example 2: Cover page with custom date and multiline description**
+```yaml
+cover_page:
+  enabled: true
+  title: "Code Review Package"
+  description: |
+    This package contains all source code files for the Q4 2024 review.
+
+    Please review all changes and provide feedback by the deadline.
+  location: "/mnt/shared/code-reviews/q4-2024"
+  date: "2024-12-15"
+  include_toc: true
+```
+
+**Example 3: Cover page without table of contents**
+```yaml
+cover_page:
+  enabled: true
+  title: "Confidential Source Code"
+  description: "Internal use only"
+  location: "Internal Repository"
+  include_toc: false
+```
+
+**Example 4: Large title for presentation**
+```yaml
+cover_page:
+  enabled: true
+  title: "Company Project Alpha"
+  title_font_size: 32
+  text_font_size: 14
+  description: "Complete technical documentation"
+  location: "https://internal.company.com/alpha"
+```
 
 ## Minimal Configuration Example
 
