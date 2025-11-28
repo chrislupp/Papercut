@@ -23,6 +23,8 @@ pub struct Config {
     pub metadata: MetadataConfig,
     #[serde(default)]
     pub warnings: WarningsConfig,
+    #[serde(default)]
+    pub cover_page: CoverPageConfig,
 }
 
 /// Expanded file entry after pattern matching
@@ -271,6 +273,49 @@ impl Default for WarningsConfig {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CoverPageConfig {
+    /// Enable or disable the cover page
+    #[serde(default = "default_false")]
+    pub enabled: bool,
+    /// Title to display on the cover page
+    #[serde(default)]
+    pub title: String,
+    /// Description text for the cover page
+    #[serde(default)]
+    pub description: String,
+    /// Location/URL where the code is kept
+    #[serde(default)]
+    pub location: String,
+    /// Date to display (auto-generates current date if empty)
+    #[serde(default)]
+    pub date: String,
+    /// Include table of contents listing all files
+    #[serde(default = "default_true")]
+    pub include_toc: bool,
+    /// Font size for the title
+    #[serde(default = "default_cover_title_font_size")]
+    pub title_font_size: u8,
+    /// Font size for the description and other text
+    #[serde(default = "default_cover_text_font_size")]
+    pub text_font_size: u8,
+}
+
+impl Default for CoverPageConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            title: String::new(),
+            description: String::new(),
+            location: String::new(),
+            date: String::new(),
+            include_toc: true,
+            title_font_size: default_cover_title_font_size(),
+            text_font_size: default_cover_text_font_size(),
+        }
+    }
+}
+
 // Default value functions
 fn default_output_dir() -> PathBuf {
     PathBuf::from("./output")
@@ -342,6 +387,14 @@ fn default_text_color() -> String {
 
 fn default_line_number_color() -> String {
     "#888888".to_string()
+}
+
+fn default_cover_title_font_size() -> u8 {
+    24
+}
+
+fn default_cover_text_font_size() -> u8 {
+    12
 }
 
 impl Config {
