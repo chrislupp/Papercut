@@ -83,10 +83,23 @@ page:
   size: Letter
 
   margins:
-    top: 2.54
-    bottom: 2.54
+    top: "1 in"
+    bottom: "1 in"
     left: 2.0
     right: 2.0
+
+header:
+  enabled: true
+  left: "APPROVED FOR PUBLIC RELEASE"
+  center: "{filename}"
+  right: "Page {page}/{total}"
+  font_size: 8
+
+footer:
+  enabled: true
+  left: "Distribution A: "
+  center: "{filename}"
+  font_size: 8
 
 metadata:
   # PDF document subject (appears in PDF properties)
