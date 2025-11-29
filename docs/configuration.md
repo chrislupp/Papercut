@@ -293,12 +293,18 @@ Controls the optional cover page that appears before the printed code.
 cover_page:
   enabled: true
   title: "Project Source Code"
+  authors: "Development Team"           # Single author
+  # Or multiple authors:
+  # authors:
+  #   - "Jane Doe"
+  #   - "John Smith"
   description: "Complete source code listing for the project review."
   location: "https://github.com/user/project"
   date: ""                    # Empty = auto-generate current date
-  include_toc: true           # Table of contents
+  include_toc: true           # Table of contents (on separate page)
   title_font_size: 24
   text_font_size: 12
+  font_family: "Times New Roman"        # Cover page font
 ```
 
 ### Fields
@@ -313,10 +319,15 @@ cover_page:
   - If empty, no title is shown
   - Uses the `title_font_size` setting
 
+- **authors** (optional): Author name(s) displayed below the title
+  - Can be a single string or a list of strings
+  - Multiple authors are displayed one per line, centered
+  - Uses the `text_font_size` setting
+
 - **description** (optional): Descriptive text about the code
   - Can be multiple lines (use YAML multiline syntax)
   - Automatically wraps to fit the page width
-  - Displayed below the title
+  - Displayed below the authors
 
 - **location** (optional): URL or location where the code is kept
   - Typically a GitHub URL, Git repository, or file path
@@ -330,30 +341,40 @@ cover_page:
 
 - **include_toc** (optional, default: `true`): Include table of contents
   - Lists all files that will be printed
-  - Shows up to 30 files with a "...and X more" message if needed
-  - Numbered list format
+  - Rendered on a separate page after the cover page
+  - Supports multiple pages for large file lists
   - Only shown if cover page is enabled
 
 - **title_font_size** (optional, default: `24`): Font size for the title in points
 
 - **text_font_size** (optional, default: `12`): Font size for description and other text in points
 
+- **font_family** (optional, default: `"Times New Roman"`): Font family for the cover page
+  - Common options: "Times New Roman", "Georgia", "Arial", "Helvetica"
+  - Falls back to Times New Roman if the specified font is not available
+  - The title and "Description" heading are rendered in bold
+
 ### Examples
 
-**Example 1: Simple cover page with auto-generated date**
+**Example 1: Simple cover page with single author**
 ```yaml
 cover_page:
   enabled: true
   title: "My Project"
+  authors: "John Doe"
   description: "Source code documentation"
   location: "https://github.com/user/myproject"
 ```
 
-**Example 2: Cover page with custom date and multiline description**
+**Example 2: Cover page with multiple authors**
 ```yaml
 cover_page:
   enabled: true
   title: "Code Review Package"
+  authors:
+    - "Jane Smith"
+    - "John Doe"
+    - "Engineering Team"
   description: |
     This package contains all source code files for the Q4 2024 review.
 
@@ -368,6 +389,7 @@ cover_page:
 cover_page:
   enabled: true
   title: "Confidential Source Code"
+  authors: "Security Team"
   description: "Internal use only"
   location: "Internal Repository"
   include_toc: false
@@ -378,6 +400,9 @@ cover_page:
 cover_page:
   enabled: true
   title: "Company Project Alpha"
+  authors:
+    - "Alpha Development Team"
+    - "Documentation Team"
   title_font_size: 32
   text_font_size: 14
   description: "Complete technical documentation"
