@@ -8,7 +8,6 @@ use std::sync::Arc;
 pub struct FontManager {
     db: Database,
     monospace_font: Option<Arc<Font>>,
-    monospace_bold_font: Option<Arc<Font>>,
     cover_font: Option<Arc<Font>>,
     cover_bold_font: Option<Arc<Font>>,
     warning_manager: Arc<WarningManager>,
@@ -25,7 +24,6 @@ impl FontManager {
         Self {
             db,
             monospace_font: None,
-            monospace_bold_font: None,
             cover_font: None,
             cover_bold_font: None,
             warning_manager,
@@ -62,37 +60,6 @@ impl FontManager {
             "Could not find any suitable monospace font. Please install a monospace font like \
              Consolas, Monaco, or DejaVu Sans Mono.".to_string()
         ))
-    }
-
-    /// Get or load a bold monospace font
-    /// Falls back to regular monospace if bold is not available
-    pub fn get_monospace_bold_font(&mut self) -> Result<Arc<Font>> {
-        if let Some(font) = &self.monospace_bold_font {
-            return Ok(Arc::clone(font));
-        }
-
-        // Try to find a bold monospace font in order of preference
-        let font_families = vec![
-            "Consolas",
-            "Monaco",
-            "Menlo",
-            "DejaVu Sans Mono",
-            "Liberation Mono",
-            "Courier New",
-            "Courier",
-            "monospace",
-        ];
-
-        for family in font_families {
-            if let Some(font) = self.try_load_bold_font(family) {
-                let font_arc = Arc::new(font);
-                self.monospace_bold_font = Some(Arc::clone(&font_arc));
-                return Ok(font_arc);
-            }
-        }
-
-        // Fall back to regular font if no bold available
-        self.get_monospace_font()
     }
 
     /// Get or load a cover page font (serif font like Times New Roman)
@@ -261,7 +228,6 @@ impl Default for FontManager {
                 db
             },
             monospace_font: None,
-            monospace_bold_font: None,
             cover_font: None,
             cover_bold_font: None,
             warning_manager: Arc::new(WarningManager::new(false)),

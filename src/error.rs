@@ -25,10 +25,6 @@ pub enum PapercutError {
 
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
-
-    #[cfg(feature = "syntax-highlighting")]
-    #[error("Syntax highlighting error: {0}\n  Tip: Try using a different theme or disabling syntax highlighting.")]
-    SyntaxHighlighting(String),
 }
 
 pub type Result<T> = std::result::Result<T, PapercutError>;

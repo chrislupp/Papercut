@@ -11,13 +11,11 @@ use std::sync::Arc;
 /// We'll just provide helper functions and let the generator manage pages directly
 pub struct PdfContext {
     pub document: Document,
-    pub config: Config,
     pub font_manager: FontManager,
     pub page_width_mm: f32,
     pub page_height_mm: f32,
     pub margin_top: f32,
     pub margin_left: f32,
-    pub margin_right: f32,
     pub margin_bottom: f32,
     pub content_width: f32,
     pub content_height: f32,
@@ -44,13 +42,11 @@ impl PdfContext {
 
         Ok(Self {
             document,
-            config,
             font_manager,
             page_width_mm: page_width_pt,
             page_height_mm: page_height_pt,
             margin_top,
             margin_left,
-            margin_right,
             margin_bottom,
             content_width,
             content_height,
@@ -63,7 +59,7 @@ impl PdfContext {
     }
 
     /// Finish the document and write to file
-    pub fn save(mut self, path: &Path) -> Result<()> {
+    pub fn save(self, path: &Path) -> Result<()> {
         // Note: krilla 0.5 doesn't expose a set_title() method yet
         // Metadata will be added in a future version
         // TODO: Add title when krilla supports it
