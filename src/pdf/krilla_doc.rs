@@ -33,10 +33,10 @@ impl PdfContext {
 
         // Calculate page dimensions and margins (all in points)
         let (page_width_pt, page_height_pt) = get_page_size_points(&config.page.size);
-        let margin_top = mm_to_points(config.page.margins.top * 10.0); // cm to mm to points
-        let margin_right = mm_to_points(config.page.margins.right * 10.0);
-        let margin_bottom = mm_to_points(config.page.margins.bottom * 10.0);
-        let margin_left = mm_to_points(config.page.margins.left * 10.0);
+        let margin_top = config.page.margins.top.as_points();
+        let margin_right = config.page.margins.right.as_points();
+        let margin_bottom = config.page.margins.bottom.as_points();
+        let margin_left = config.page.margins.left.as_points();
 
         let content_width = page_width_pt - margin_left - margin_right;
         let content_height = page_height_pt - margin_top - margin_bottom;
@@ -110,7 +110,3 @@ fn get_page_size_points(size: &PageSize) -> (f32, f32) {
     }
 }
 
-/// Convert millimeters to points (1 point = 1/72 inch, 1 inch = 25.4mm)
-fn mm_to_points(mm: f32) -> f32 {
-    mm * 72.0 / 25.4
-}

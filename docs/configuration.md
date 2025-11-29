@@ -160,9 +160,9 @@ Controls page layout and formatting.
 page:
   size: A4
   margins:
-    top: 2.5
-    bottom: 2.5
-    left: 2.0
+    top: 2.5          # 2.5 cm (plain number = centimeters)
+    bottom: "1in"     # 1 inch (string with unit)
+    left: "2.0cm"     # 2.0 cm (explicit unit)
     right: 2.0
   font_size: 10
   line_numbers: true
@@ -176,11 +176,16 @@ page:
   - `Letter`: 8.5" × 11" (common in North America)
   - `Legal`: 8.5" × 14" (legal documents)
 
-- **margins** (optional): Page margins in centimeters
+- **margins** (optional): Page margins (supports centimeters and inches)
   - **top** (default: `2.5`): Top margin
   - **bottom** (default: `2.5`): Bottom margin
   - **left** (default: `2.0`): Left margin
   - **right** (default: `2.0`): Right margin
+
+  **Margin value formats:**
+  - Plain number: Treated as centimeters (e.g., `2.5` = 2.5 cm)
+  - String with `cm` suffix: Centimeters (e.g., `"2.5cm"`)
+  - String with `in` suffix: Inches (e.g., `"1in"`, `"0.75in"`)
 
 - **font_size** (optional, default: `10`): Font size for code content in points
   - Typical values: 8-12

@@ -1,6 +1,126 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{self, Visitor};
+use std::fmt;
 use std::path::PathBuf;
 use crate::error::{PapercutError, Result};
+
+/// A margin value that can be specified in cm or inches.
+/// Internally stored as points (1 inch = 72 points, 1 cm = 28.3465 points).
+#[derive(Debug, Clone, Copy)]
+pub struct MarginValue {
+    points: f32,
+}
+
+impl MarginValue {
+    /// Create a margin value from centimeters
+    pub fn from_cm(cm: f32) -> Self {
+        Self { points: cm * 28.3465 }
+    }
+
+    /// Create a margin value from inches
+    pub fn from_inches(inches: f32) -> Self {
+        Self { points: inches * 72.0 }
+    }
+
+    /// Get the value in points
+    pub fn as_points(&self) -> f32 {
+        self.points
+    }
+
+    /// Get the value in centimeters
+    pub fn as_cm(&self) -> f32 {
+        self.points / 28.3465
+    }
+}
+
+impl<'de> Deserialize<'de> for MarginValue {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct MarginValueVisitor;
+
+        impl<'de> Visitor<'de> for MarginValueVisitor {
+            type Value = MarginValue;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a number (in cm) or a string like '1in' or '2.5cm'")
+            }
+
+            fn visit_i64<E>(self, value: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(MarginValue::from_cm(value as f32))
+            }
+
+            fn visit_u64<E>(self, value: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(MarginValue::from_cm(value as f32))
+            }
+
+            fn visit_f64<E>(self, value: f64) -> std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(MarginValue::from_cm(value as f32))
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let value = value.trim();
+
+                // Try parsing as inches
+                if let Some(num_str) = value.strip_suffix("in") {
+                    let num: f32 = num_str.trim().parse().map_err(|_| {
+                        de::Error::custom(format!(
+                            "Invalid inch value '{}'. Expected a number followed by 'in'",
+                            value
+                        ))
+                    })?;
+                    return Ok(MarginValue::from_inches(num));
+                }
+
+                // Try parsing as centimeters
+                if let Some(num_str) = value.strip_suffix("cm") {
+                    let num: f32 = num_str.trim().parse().map_err(|_| {
+                        de::Error::custom(format!(
+                            "Invalid centimeter value '{}'. Expected a number followed by 'cm'",
+                            value
+                        ))
+                    })?;
+                    return Ok(MarginValue::from_cm(num));
+                }
+
+                // Try parsing as a plain number (assume cm for backward compatibility)
+                if let Ok(num) = value.parse::<f32>() {
+                    return Ok(MarginValue::from_cm(num));
+                }
+
+                Err(de::Error::custom(format!(
+                    "Invalid margin value '{}'. Use a number (in cm) or a string like '1in' or '2.5cm'",
+                    value
+                )))
+            }
+        }
+
+        deserializer.deserialize_any(MarginValueVisitor)
+    }
+}
+
+impl Serialize for MarginValue {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Serialize as centimeters (the default unit)
+        serializer.serialize_f32(self.as_cm())
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
@@ -143,13 +263,13 @@ pub enum PageSize {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MarginsConfig {
     #[serde(default = "default_margin_top")]
-    pub top: f32,
+    pub top: MarginValue,
     #[serde(default = "default_margin_bottom")]
-    pub bottom: f32,
+    pub bottom: MarginValue,
     #[serde(default = "default_margin_left")]
-    pub left: f32,
+    pub left: MarginValue,
     #[serde(default = "default_margin_right")]
-    pub right: f32,
+    pub right: MarginValue,
 }
 
 impl Default for MarginsConfig {
@@ -417,20 +537,20 @@ fn default_wrap_indent() -> usize {
     4
 }
 
-fn default_margin_top() -> f32 {
-    2.5
+fn default_margin_top() -> MarginValue {
+    MarginValue::from_cm(2.5)
 }
 
-fn default_margin_bottom() -> f32 {
-    2.5
+fn default_margin_bottom() -> MarginValue {
+    MarginValue::from_cm(2.5)
 }
 
-fn default_margin_left() -> f32 {
-    2.0
+fn default_margin_left() -> MarginValue {
+    MarginValue::from_cm(2.0)
 }
 
-fn default_margin_right() -> f32 {
-    2.0
+fn default_margin_right() -> MarginValue {
+    MarginValue::from_cm(2.0)
 }
 
 fn default_header_footer_font_size() -> u8 {
@@ -542,9 +662,14 @@ impl Config {
             }
         }
 
-        // Validate margin values
-        if self.page.margins.top < 0.0 || self.page.margins.bottom < 0.0 ||
-           self.page.margins.left < 0.0 || self.page.margins.right < 0.0 {
+        // Validate margin values (using points, which are always non-negative from valid input)
+        let margin_top_pt = self.page.margins.top.as_points();
+        let margin_bottom_pt = self.page.margins.bottom.as_points();
+        let margin_left_pt = self.page.margins.left.as_points();
+        let margin_right_pt = self.page.margins.right.as_points();
+
+        if margin_top_pt < 0.0 || margin_bottom_pt < 0.0 ||
+           margin_left_pt < 0.0 || margin_right_pt < 0.0 {
             return Err(PapercutError::InvalidConfig(
                 "Margins must be non-negative".to_string()
             ));
@@ -556,13 +681,6 @@ impl Config {
                 "Font size must be greater than 0".to_string()
             ));
         }
-
-        // Validate that content area is positive
-        // Convert margins from cm to points (1 cm = 28.35 points)
-        let margin_top_pt = self.page.margins.top * 28.35;
-        let margin_bottom_pt = self.page.margins.bottom * 28.35;
-        let margin_left_pt = self.page.margins.left * 28.35;
-        let margin_right_pt = self.page.margins.right * 28.35;
 
         // Get page size in points
         let (page_width_pt, page_height_pt) = match self.page.size {
@@ -579,7 +697,7 @@ impl Config {
             return Err(PapercutError::InvalidConfig(
                 format!(
                     "Left and right margins ({:.2} cm + {:.2} cm) exceed page width. Content area has no width.",
-                    self.page.margins.left, self.page.margins.right
+                    self.page.margins.left.as_cm(), self.page.margins.right.as_cm()
                 )
             ));
         }
@@ -588,7 +706,7 @@ impl Config {
             return Err(PapercutError::InvalidConfig(
                 format!(
                     "Top and bottom margins ({:.2} cm + {:.2} cm) exceed page height. Content area has no height.",
-                    self.page.margins.top, self.page.margins.bottom
+                    self.page.margins.top.as_cm(), self.page.margins.bottom.as_cm()
                 )
             ));
         }

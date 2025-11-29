@@ -71,12 +71,14 @@ page:
   # - Legal: 8.5" x 14" (common for legal documents)
   size: Letter
 
-  # Page margins in centimeters
+  # Page margins - supports centimeters (default) or inches
+  # Plain numbers are treated as centimeters for backward compatibility
+  # Use "Xcm" or "Xin" strings for explicit units
   margins:
-    top: 2.5
-    bottom: 2.5
-    left: 2.0
-    right: 2.0
+    top: 2.5          # 2.5 cm (plain number = centimeters)
+    bottom: "1in"     # 1 inch
+    left: "2.0cm"     # 2.0 cm (explicit)
+    right: 2.0        # 2.0 cm
 
   # Font size for code content (in points)
   # Typical values: 8-12
