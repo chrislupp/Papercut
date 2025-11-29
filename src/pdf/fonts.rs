@@ -8,6 +8,9 @@ use std::sync::Arc;
 pub struct FontManager {
     db: Database,
     monospace_font: Option<Arc<Font>>,
+    monospace_bold_font: Option<Arc<Font>>,
+    cover_font: Option<Arc<Font>>,
+    cover_bold_font: Option<Arc<Font>>,
     warning_manager: Arc<WarningManager>,
 }
 
@@ -22,6 +25,9 @@ impl FontManager {
         Self {
             db,
             monospace_font: None,
+            monospace_bold_font: None,
+            cover_font: None,
+            cover_bold_font: None,
             warning_manager,
         }
     }
@@ -58,12 +64,132 @@ impl FontManager {
         ))
     }
 
+    /// Get or load a bold monospace font
+    /// Falls back to regular monospace if bold is not available
+    pub fn get_monospace_bold_font(&mut self) -> Result<Arc<Font>> {
+        if let Some(font) = &self.monospace_bold_font {
+            return Ok(Arc::clone(font));
+        }
+
+        // Try to find a bold monospace font in order of preference
+        let font_families = vec![
+            "Consolas",
+            "Monaco",
+            "Menlo",
+            "DejaVu Sans Mono",
+            "Liberation Mono",
+            "Courier New",
+            "Courier",
+            "monospace",
+        ];
+
+        for family in font_families {
+            if let Some(font) = self.try_load_bold_font(family) {
+                let font_arc = Arc::new(font);
+                self.monospace_bold_font = Some(Arc::clone(&font_arc));
+                return Ok(font_arc);
+            }
+        }
+
+        // Fall back to regular font if no bold available
+        self.get_monospace_font()
+    }
+
+    /// Get or load a cover page font (serif font like Times New Roman)
+    pub fn get_cover_font(&mut self, font_family: &str) -> Result<Arc<Font>> {
+        if let Some(font) = &self.cover_font {
+            return Ok(Arc::clone(font));
+        }
+
+        // Try the specified font first, then fallbacks
+        let font_families = if font_family.is_empty() {
+            vec![
+                "Times New Roman",
+                "Times",
+                "Georgia",
+                "DejaVu Serif",
+                "Liberation Serif",
+                "serif",
+            ]
+        } else {
+            vec![
+                font_family,
+                "Times New Roman",
+                "Times",
+                "Georgia",
+                "DejaVu Serif",
+                "Liberation Serif",
+                "serif",
+            ]
+        };
+
+        for family in font_families {
+            if let Some(font) = self.try_load_font(family) {
+                let font_arc = Arc::new(font);
+                self.cover_font = Some(Arc::clone(&font_arc));
+                return Ok(font_arc);
+            }
+        }
+
+        // Fall back to monospace if no serif font available
+        self.get_monospace_font()
+    }
+
+    /// Get or load a bold cover page font
+    pub fn get_cover_bold_font(&mut self, font_family: &str) -> Result<Arc<Font>> {
+        if let Some(font) = &self.cover_bold_font {
+            return Ok(Arc::clone(font));
+        }
+
+        // Try the specified font first, then fallbacks
+        let font_families = if font_family.is_empty() {
+            vec![
+                "Times New Roman",
+                "Times",
+                "Georgia",
+                "DejaVu Serif",
+                "Liberation Serif",
+                "serif",
+            ]
+        } else {
+            vec![
+                font_family,
+                "Times New Roman",
+                "Times",
+                "Georgia",
+                "DejaVu Serif",
+                "Liberation Serif",
+                "serif",
+            ]
+        };
+
+        for family in font_families {
+            if let Some(font) = self.try_load_bold_font(family) {
+                let font_arc = Arc::new(font);
+                self.cover_bold_font = Some(Arc::clone(&font_arc));
+                return Ok(font_arc);
+            }
+        }
+
+        // Fall back to regular cover font if no bold available
+        self.get_cover_font(font_family)
+    }
+
     /// Try to load a font by family name
     fn try_load_font(&self, family: &str) -> Option<Font> {
-        // Query for a regular (non-bold, non-italic) version of the font
+        self.try_load_font_with_weight(family, fontdb::Weight::NORMAL)
+    }
+
+    /// Try to load a bold font by family name
+    fn try_load_bold_font(&self, family: &str) -> Option<Font> {
+        self.try_load_font_with_weight(family, fontdb::Weight::BOLD)
+    }
+
+    /// Try to load a font by family name and weight
+    fn try_load_font_with_weight(&self, family: &str, weight: fontdb::Weight) -> Option<Font> {
         let query = Query {
             families: &[fontdb::Family::Name(family)],
-            weight: fontdb::Weight::NORMAL,
+            weight,
             stretch: fontdb::Stretch::Normal,
             style: fontdb::Style::Normal,
         };
@@ -128,7 +254,18 @@ impl FontManager {
 
 impl Default for FontManager {
     fn default() -> Self {
-        Self::new(Arc::new(WarningManager::new(false)))
+        Self {
+            db: {
+                let mut db = Database::new();
+                db.load_system_fonts();
+                db
+            },
+            monospace_font: None,
+            monospace_bold_font: None,
+            cover_font: None,
+            cover_bold_font: None,
+            warning_manager: Arc::new(WarningManager::new(false)),
+        }
     }
 }
 
