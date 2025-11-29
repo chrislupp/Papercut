@@ -22,6 +22,7 @@ target
 
 # Generated PDF output files
 output/
+pa_output/
 releases/
 dist/
 
@@ -36,6 +37,3 @@ packaging/macos/build/
 # macOS system files
 .DS_Store
 **/.DS_Store
-
-# User-specific configuration file (default config)
-.papercut.yaml

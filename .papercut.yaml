@@ -1,0 +1,99 @@
+# Papercut - Full Configuration Example
+# This file demonstrates all available configuration options
+# Run from repo root: cargo run --release -- -c examples/full_config.yaml
+
+
+cover_page:
+  enabled: true
+
+  title: "Paper Cut"
+  authors:
+    - "Christopher A. Lupp"
+
+  description: |
+    Paper Cut is a utility, written in Rust, that creates a pdf of source code
+    files. The main purpose is to aid public release purposes, but it can be
+    used for any process that requires a pdf copy of source code.
+
+    This is the complete source code listing for the Paper Cut project. This
+    document contains all source files, configuration examples, and
+    documentation for public release purposes.
+
+  location: "https://github.com/chrislupp/papercut"
+
+  # date: "2025-12-01"
+
+  include_toc: true
+  title_font_size: 24
+  text_font_size: 12
+
+output:
+  mode: single
+  directory: ./pa_output
+  filename: papercut_pa.pdf
+
+# ===== FILES TO CONVERT =====
+files:
+  # List of source code files/patterns to convert to PDF
+  # Supports: individual files, glob patterns, directories
+
+  # Example 1: Directory scanning with filters
+  # Scans the entire 'src' directory recursively
+  - path: src/
+    # Only include Rust files
+    include_types: ["rs"]
+    # Exclude test files and build artifacts
+    exclude:
+      - "target/**"
+    title: "Source Code"
+
+  # Example 2: Glob pattern to match multiple files
+  # Matches all YAML files in examples/ directory
+  - path: "examples/*.yaml"
+    title: "Configuration Examples"
+
+  # Example 3: Individual files with custom titles
+  - path: README.md
+    title: "Project Documentation"
+
+  - path: LICENSE
+    title: "License Agreement"
+
+  - path: Cargo.toml
+    title: "Project Manifest"
+
+  # Example 4: Pattern with wildcards
+  # Matches all markdown files in docs directory
+  - path: "docs/*.md"
+    title: "Documentation"
+
+# ===== SYNTAX HIGHLIGHTING =====
+syntax_highlighting:
+  # Enable or disable syntax highlighting
+  # Requires the 'syntax-highlighting' feature to be enabled (default)
+  enabled: true
+
+  # Syntax highlighting theme name
+  # Run 'papercut --list-themes' to see all available themes
+  # Built-in presets: vscode-dark, vscode-light, jetbrains-darcula, jetbrains-light
+  theme: vscode-light
+
+# ===== PAGE SETTINGS =====
+page:
+  size: Letter
+
+  margins:
+    top: 2.54
+    bottom: 2.54
+    left: 2.0
+    right: 2.0
+
+metadata:
+  # PDF document subject (appears in PDF properties)
+  subject: "Paper Cut PA Review"
+
+  # PDF document keywords (array of strings)
+  keywords:
+    - source code
+    - papercut
+    - public release
