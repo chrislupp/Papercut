@@ -138,6 +138,133 @@ fn should_overwrite_file(path: &Path, force: bool) -> Result<bool> {
     Ok(input.trim().eq_ignore_ascii_case("y"))
 }
 
+/// Count the number of wrapped lines for a file's content
+fn count_wrapped_lines(content: &str, config: &Config, ctx: &PdfContext) -> usize {
+    let font_size = config.page.font_size as f32;
+    let line_num_width = if config.page.line_numbers {
+        font_size * 3.5
+    } else {
+        0.0
+    };
+    let available_width = ctx.content_width - line_num_width;
+    let char_width = font_size * 0.6;
+    let max_chars = (available_width / char_width).floor() as usize;
+
+    let mut total_lines = 0;
+    for line in content.lines() {
+        if config.page.wrap_long_lines {
+            let line_chars = line.chars().count();
+            if line_chars == 0 {
+                total_lines += 1;
+            } else {
+                // First line uses full width, continuation lines lose wrap_indent
+                let mut remaining = line_chars;
+                let mut is_first = true;
+                while remaining > 0 {
+                    let available = if is_first {
+                        max_chars
+                    } else {
+                        max_chars.saturating_sub(config.page.wrap_indent)
+                    };
+                    if available == 0 {
+                        break; // Prevent infinite loop
+                    }
+                    total_lines += 1;
+                    remaining = remaining.saturating_sub(available);
+                    is_first = false;
+                }
+            }
+        } else {
+            total_lines += 1;
+        }
+    }
+    total_lines
+}
+
+/// Estimate how many TOC entries fit on a single page
+fn estimate_toc_entries_per_page(config: &Config, ctx: &PdfContext) -> usize {
+    let list_font_size = config.cover_page.text_font_size as f32;
+    let line_height = list_font_size * 1.6;
+
+    // First page has header and separator
+    let toc_header_height = (config.cover_page.text_font_size as f32 + 4.0) + 15.0 + 25.0;
+    let available_height = ctx.content_height - toc_header_height - 20.0;
+
+    (available_height / line_height).floor() as usize
+}
+
+/// Calculate which page each file starts on (0-indexed)
+fn calculate_file_pages(config: &Config, ctx: &PdfContext) -> Result<Vec<usize>> {
+    let mut file_pages = Vec::new();
+    let mut current_page: usize = 0;
+    let mut current_y = ctx.margin_top;
+
+    // Account for cover page and TOC
+    if config.cover_page.enabled {
+        current_page += 1; // Cover page
+
+        // Calculate TOC pages
+        if config.cover_page.include_toc && !config.expanded_files.is_empty() {
+            let entries_first_page = estimate_toc_entries_per_page(config, ctx);
+            // Subsequent pages have more room (no header)
+            let list_font_size = config.cover_page.text_font_size as f32;
+            let line_height = list_font_size * 1.6;
+            let entries_per_subsequent_page = ((ctx.content_height - 20.0) / line_height).floor() as usize;
+
+            let total_files = config.expanded_files.len();
+            if total_files <= entries_first_page {
+                current_page += 1;
+            } else {
+                current_page += 1; // First TOC page
+                let remaining = total_files - entries_first_page;
+                if entries_per_subsequent_page > 0 {
+                    current_page += (remaining + entries_per_subsequent_page - 1) / entries_per_subsequent_page;
+                }
+            }
+        }
+
+        current_y = ctx.margin_top; // Reset for content pages
+    }
+
+    let font_size = config.page.font_size as f32;
+    let line_height = font_size * config.page.line_spacing;
+    let file_header_height = 8.0 + 25.0 + 10.0; // separator spacing + header + separator spacing
+
+    for file_entry in &config.expanded_files {
+        // Check if we need a new page before this file
+        // File header needs: separator + header text + separator + first line
+        let min_space_needed = file_header_height + line_height;
+        if current_y + min_space_needed > ctx.page_height_mm - ctx.margin_bottom {
+            current_page += 1;
+            current_y = ctx.margin_top;
+        }
+
+        // Record this file's start page
+        file_pages.push(current_page);
+
+        // Calculate space used by this file
+        let content = fs::read_to_string(&file_entry.path).unwrap_or_default();
+        let line_count = count_wrapped_lines(&content, config, ctx);
+
+        // Add file header space
+        current_y += file_header_height;
+
+        // Process each line
+        for _ in 0..line_count {
+            current_y += line_height;
+            if current_y + line_height > ctx.page_height_mm - ctx.margin_bottom {
+                current_page += 1;
+                current_y = ctx.margin_top;
+            }
+        }
+
+        // End-of-file spacing
+        current_y += 10.0 + 15.0; // separator + spacing after file
+    }
+
+    Ok(file_pages)
+}
+
 /// Main entry point for PDF generation
 pub fn generate(config: Config, verbose: bool, force: bool, warning_manager: Arc<WarningManager>) -> Result<()> {
     match config.output.mode {
@@ -159,6 +286,9 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     // Set PDF metadata (falls back to cover page values)
     let effective_metadata = config.effective_metadata();
     ctx.set_metadata(&effective_metadata);
+
+    // Pre-calculate which page each file starts on (for TOC hyperlinks)
+    let file_pages = calculate_file_pages(&config, &ctx)?;
 
     let font = ctx.font_manager.get_monospace_font()?;
 
@@ -192,7 +322,7 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 page = ctx.document.start_page_with(ctx.page_settings());
                 surface = page.surface();
 
-                let files_rendered = cover_page::render_toc_page(
+                let (files_rendered, toc_links) = cover_page::render_toc_page(
                     &mut ctx.font_manager,
                     &config,
                     &mut surface,
@@ -201,9 +331,15 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                     ctx.content_width,
                     ctx.content_height,
                     toc_start_index,
+                    &file_pages,
                 )?;
 
+                // Finish surface before adding annotations to page
                 surface.finish();
+
+                // Add link annotations to the page
+                cover_page::add_toc_annotations(&mut page, toc_links, ctx.margin_left);
+
                 page.finish();
 
                 toc_start_index += files_rendered;

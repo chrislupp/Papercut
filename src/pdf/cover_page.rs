@@ -2,7 +2,10 @@ use crate::config::Config;
 use crate::error::Result;
 use crate::pdf::fonts::FontManager;
 use crate::pdf::colors::rgb_to_paint;
-use krilla::geom::{PathBuilder, Point};
+use krilla::annotation::{Annotation, LinkAnnotation, Target};
+use krilla::destination::{Destination, XyzDestination};
+use krilla::geom::{PathBuilder, Point, Rect};
+use krilla::page::Page;
 use krilla::paint::Stroke;
 use krilla::text::TextDirection;
 use krilla::surface::Surface;
@@ -141,8 +144,18 @@ pub fn render_cover_page(
     Ok(())
 }
 
+/// Data for a TOC link annotation to be added after rendering
+pub struct TocLink {
+    pub rect: Rect,
+    pub target_page: usize,
+    pub target_y: f32,
+}
+
 /// Renders the table of contents on its own page(s)
-/// Returns the number of TOC pages rendered (0 if TOC is disabled or no files)
+/// Returns (files_rendered, annotations) - the annotations should be added to the page after surface.finish()
+///
+/// Parameters:
+/// - `file_pages`: Pre-calculated page indices for each file (for hyperlinks)
 pub fn render_toc_page(
     font_manager: &mut FontManager,
     config: &Config,
@@ -152,9 +165,10 @@ pub fn render_toc_page(
     content_width: f32,
     content_height: f32,
     start_index: usize,
-) -> Result<usize> {
+    file_pages: &[usize],
+) -> Result<(usize, Vec<TocLink>)> {
     if !config.cover_page.include_toc || config.expanded_files.is_empty() {
-        return Ok(0);
+        return Ok((0, Vec::new()));
     }
 
     let font_family = &config.cover_page.font_family;
@@ -162,6 +176,7 @@ pub fn render_toc_page(
     let bold_font = font_manager.get_cover_bold_font(font_family)?;
     let mut current_y = margin_top;
     let max_y = margin_top + content_height - 20.0;
+    let mut toc_links = Vec::new();
 
     // Draw TOC header (only on first TOC page)
     if start_index == 0 {
@@ -194,7 +209,7 @@ pub fn render_toc_page(
         // Check if we're running out of space
         if current_y + line_height > max_y {
             // Return number of files we rendered - caller will create new page
-            return Ok(files_rendered);
+            return Ok((files_rendered, toc_links));
         }
 
         // Get the display path - use relative path if available, otherwise filename
@@ -220,12 +235,47 @@ pub fn render_toc_page(
             false,
             TextDirection::Auto,
         );
+
+        // Collect link annotation data for this TOC entry
+        if let Some(&target_page) = file_pages.get(idx) {
+            let text_width = estimate_text_width(&truncated_entry, list_font_size);
+            // Create rectangle for clickable area (x, y is top-left in krilla coordinates)
+            if let Some(rect) = Rect::from_xywh(
+                margin_left,
+                current_y - list_font_size,  // Top of text line
+                text_width.min(content_width),
+                line_height,
+            ) {
+                toc_links.push(TocLink {
+                    rect,
+                    target_page,
+                    target_y: margin_top,
+                });
+            }
+        }
+
         current_y += line_height;
         files_rendered += 1;
     }
 
-    // If we rendered all files, return a special value to indicate completion
-    Ok(files_rendered)
+    Ok((files_rendered, toc_links))
+}
+
+/// Add TOC link annotations to a page
+pub fn add_toc_annotations(page: &mut Page, toc_links: Vec<TocLink>, margin_left: f32) {
+    for link_data in toc_links {
+        let destination = XyzDestination::new(
+            link_data.target_page,
+            Point::from_xy(margin_left, link_data.target_y),
+        );
+
+        let link = LinkAnnotation::new(
+            link_data.rect,
+            Target::Destination(Destination::from(destination)),
+        );
+        let annotation = Annotation::new_link(link, None);
+        page.add_annotation(annotation);
+    }
 }
 
 /// Check if TOC should be rendered
