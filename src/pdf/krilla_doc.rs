@@ -1,8 +1,9 @@
-use crate::config::{Config, PageSize};
+use crate::config::{Config, EffectiveMetadata, PageSize};
 use crate::error::{PapercutError, Result};
 use crate::pdf::fonts::FontManager;
 use crate::warnings::WarningManager;
 use krilla::Document;
+use krilla::metadata::Metadata;
 use krilla::page::PageSettings;
 use std::path::Path;
 use std::sync::Arc;
@@ -58,12 +59,31 @@ impl PdfContext {
         PageSettings::new(self.page_width_mm, self.page_height_mm)
     }
 
+    /// Set PDF metadata from effective metadata (merged config + cover page)
+    pub fn set_metadata(&mut self, effective: &EffectiveMetadata) {
+        let mut metadata = Metadata::new();
+
+        if !effective.title.is_empty() {
+            metadata = metadata.title(effective.title.clone());
+        }
+
+        if !effective.author.is_empty() {
+            metadata = metadata.authors(vec![effective.author.clone()]);
+        }
+
+        if !effective.subject.is_empty() {
+            metadata = metadata.description(effective.subject.clone());
+        }
+
+        if !effective.keywords.is_empty() {
+            metadata = metadata.keywords(effective.keywords.clone());
+        }
+
+        self.document.set_metadata(metadata);
+    }
+
     /// Finish the document and write to file
     pub fn save(self, path: &Path) -> Result<()> {
-        // Note: krilla 0.5 doesn't expose a set_title() method yet
-        // Metadata will be added in a future version
-        // TODO: Add title when krilla supports it
-
         // Finish and get PDF bytes
         let pdf_bytes = self.document
             .finish()

@@ -302,7 +302,7 @@ pub struct CoverPageConfig {
     /// Font size for the description and other text
     #[serde(default = "default_cover_text_font_size")]
     pub text_font_size: u8,
-    /// Font family for the cover page (default: Times New Roman)
+    /// Font family for the cover page (default: Arial)
     #[serde(default = "default_cover_font_family")]
     pub font_family: String,
 }
@@ -463,7 +463,7 @@ fn default_cover_text_font_size() -> u8 {
 }
 
 fn default_cover_font_family() -> String {
-    "Times New Roman".to_string()
+    "Arial".to_string()
 }
 
 impl Config {
@@ -608,4 +608,31 @@ impl Config {
 
         Ok(())
     }
+
+    /// Get effective metadata, falling back to cover page values when metadata fields are empty
+    pub fn effective_metadata(&self) -> EffectiveMetadata {
+        EffectiveMetadata {
+            title: if self.metadata.title.is_empty() {
+                self.cover_page.title.clone()
+            } else {
+                self.metadata.title.clone()
+            },
+            author: if self.metadata.author.is_empty() {
+                self.cover_page.authors.join(", ")
+            } else {
+                self.metadata.author.clone()
+            },
+            subject: self.metadata.subject.clone(),
+            keywords: self.metadata.keywords.clone(),
+        }
+    }
+}
+
+/// Effective metadata after merging with cover page values
+#[derive(Debug, Clone)]
+pub struct EffectiveMetadata {
+    pub title: String,
+    pub author: String,
+    pub subject: String,
+    pub keywords: Vec<String>,
 }

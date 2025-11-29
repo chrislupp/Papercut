@@ -155,6 +155,11 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     let output_path = config.output.directory.join(&config.output.filename);
 
     let mut ctx = PdfContext::new(config.clone(), Arc::clone(&warning_manager))?;
+
+    // Set PDF metadata (falls back to cover page values)
+    let effective_metadata = config.effective_metadata();
+    ctx.set_metadata(&effective_metadata);
+
     let font = ctx.font_manager.get_monospace_font()?;
 
     // Start first page
@@ -693,6 +698,11 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let output_path = config.output.directory.join(format!("{}.pdf", output_filename));
 
         let mut ctx = PdfContext::new(config.clone(), Arc::clone(&warning_manager))?;
+
+        // Set PDF metadata (falls back to cover page values)
+        let effective_metadata = config.effective_metadata();
+        ctx.set_metadata(&effective_metadata);
+
         let font = ctx.font_manager.get_monospace_font()?;
 
         // Start page
