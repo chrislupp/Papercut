@@ -269,12 +269,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 source: e,
             })?;
 
-        // Get file title
-        let default_title = file_entry.path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("Unknown")
-            .to_string();
-        let title = file_entry.title.as_ref().unwrap_or(&default_title);
+        // Get file path for header
+        let file_path_str = file_entry.path.display().to_string();
 
         // Add separator line above file header
         let mut path_builder = PathBuilder::new();
@@ -302,7 +298,7 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
             Point::from_xy(ctx.margin_left, current_y + 12.0),
             font.as_ref().clone(),
             12.0,
-            &format!("FILE: {}", title),
+            &file_path_str,
             false,
             TextDirection::Auto,
         );

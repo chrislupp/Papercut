@@ -31,7 +31,6 @@ pub struct Config {
 #[derive(Debug, Clone)]
 pub struct ExpandedFileEntry {
     pub path: PathBuf,
-    pub title: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -501,11 +500,10 @@ impl Config {
                 &warning_manager,
             )?;
 
-            // Add each expanded file with the original title (if provided)
+            // Add each expanded file
             for file_path in files {
                 expanded_files.push(ExpandedFileEntry {
                     path: file_path,
-                    title: file_entry.title.clone(),
                 });
             }
         }
