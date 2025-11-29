@@ -36,3 +36,6 @@ packaging/macos/build/
 # macOS system files
 .DS_Store
 **/.DS_Store
+
+# User-specific configuration file (default config)
+.papercut.yaml

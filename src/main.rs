@@ -24,9 +24,9 @@ use warnings::{WarningManager, WarningCategory};
                   It supports customizable headers, footers, syntax highlighting, and various page formatting options."
 )]
 struct Args {
-    /// Path to the YAML configuration file
+    /// Path to the YAML configuration file (default: .papercut.yaml)
     #[arg(short, long, value_name = "FILE")]
-    config: PathBuf,
+    config: Option<PathBuf>,
 
     /// Verbose output
     #[arg(short, long)]
@@ -55,12 +55,29 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Load configuration
-    if args.verbose {
-        println!("Loading configuration from: {}", args.config.display());
+    // Determine config file path
+    let default_config = PathBuf::from(".papercut.yaml");
+    let config_path = args.config.as_ref().unwrap_or(&default_config);
+
+    // Check if config file exists
+    if !config_path.exists() {
+        if args.config.is_some() {
+            return Err(error::PapercutError::FileNotFound(
+                config_path.display().to_string()
+            ));
+        } else {
+            return Err(error::PapercutError::Config(
+                "No configuration file found. Create a .papercut.yaml file or specify one with -c/--config".to_string()
+            ));
+        }
     }
 
-    let config = Config::from_file(&args.config)?;
+    // Load configuration
+    if args.verbose {
+        println!("Loading configuration from: {}", config_path.display());
+    }
+
+    let config = Config::from_file(config_path)?;
 
     if args.verbose {
         println!("Configuration loaded successfully");
