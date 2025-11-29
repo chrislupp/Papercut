@@ -8,8 +8,8 @@ use krilla::text::TextDirection;
 use krilla::surface::Surface;
 use chrono::Local;
 
-/// Renders a cover page on the given surface
-/// The caller should finish the page and start a new one after calling this
+/// Renders the main cover page (title, description, location, date)
+/// Returns Ok(()) - the TOC should be rendered on a separate page
 pub fn render_cover_page(
     font_manager: &mut FontManager,
     config: &Config,
@@ -17,101 +17,108 @@ pub fn render_cover_page(
     margin_left: f32,
     margin_top: f32,
     content_width: f32,
-    content_height: f32,
+    _content_height: f32,
 ) -> Result<()> {
-    let font = font_manager.get_monospace_font()?;
+    let font_family = &config.cover_page.font_family;
+    let font = font_manager.get_cover_font(font_family)?;
+    let bold_font = font_manager.get_cover_bold_font(font_family)?;
 
-    // Calculate center X position
-    let center_x = margin_left + content_width / 2.0;
-    let mut current_y = margin_top + 100.0; // Start with some top padding
+    let mut current_y = margin_top + 80.0; // Start with some top padding
 
-    // Render title (large, centered)
+    // Render title (large, centered, bold)
     if !config.cover_page.title.is_empty() {
+        let title_font_size = config.cover_page.title_font_size as f32;
+        let title_width = estimate_text_width(&config.cover_page.title, title_font_size);
+        let title_x = margin_left + (content_width - title_width) / 2.0;
+
         surface.draw_text(
-            Point::from_xy(center_x, current_y),
-            font.as_ref().clone(),
-            config.cover_page.title_font_size as f32,
+            Point::from_xy(title_x.max(margin_left), current_y),
+            bold_font.as_ref().clone(),
+            title_font_size,
             &config.cover_page.title,
             false,
             TextDirection::Auto,
         );
-        current_y += config.cover_page.title_font_size as f32 + 30.0;
+        current_y += title_font_size + 20.0;
     }
 
-    // Render description (wrapped if needed)
+    // Render authors (centered, below title, one per line)
+    if !config.cover_page.authors.is_empty() {
+        let text_font_size = config.cover_page.text_font_size as f32;
+        let line_height = text_font_size * 1.4;
+
+        for author in &config.cover_page.authors {
+            let author_width = estimate_text_width(author, text_font_size);
+            let author_x = margin_left + (content_width - author_width) / 2.0;
+
+            surface.draw_text(
+                Point::from_xy(author_x.max(margin_left), current_y),
+                font.as_ref().clone(),
+                text_font_size,
+                author,
+                false,
+                TextDirection::Auto,
+            );
+            current_y += line_height;
+        }
+        current_y += 20.0; // Extra spacing after authors
+    } else {
+        current_y += 20.0; // Extra spacing if no authors
+    }
+
+    // Render description with bold heading
     if !config.cover_page.description.is_empty() {
         let text_font_size = config.cover_page.text_font_size as f32;
         let line_height = text_font_size * 1.5;
 
-        // Simple line wrapping - split by newlines and long lines
-        let max_line_width = content_width * 0.8; // Use 80% of content width for description
-        let approx_char_width = text_font_size * 0.6; // Approximate monospace character width
-        let max_chars_per_line = (max_line_width / approx_char_width) as usize;
+        // Draw "Description" heading in bold
+        surface.draw_text(
+            Point::from_xy(margin_left, current_y),
+            bold_font.as_ref().clone(),
+            text_font_size,
+            "Description",
+            false,
+            TextDirection::Auto,
+        );
+        current_y += line_height + 5.0;
 
-        for paragraph in config.cover_page.description.split('\n') {
-            if paragraph.is_empty() {
-                current_y += line_height / 2.0;
-                continue;
-            }
-
-            // Wrap long lines
-            let words: Vec<&str> = paragraph.split_whitespace().collect();
-            let mut line = String::new();
-
-            for word in words {
-                let test_line = if line.is_empty() {
-                    word.to_string()
-                } else {
-                    format!("{} {}", line, word)
-                };
-
-                if test_line.len() > max_chars_per_line && !line.is_empty() {
-                    // Draw current line
-                    surface.draw_text(
-                        Point::from_xy(center_x, current_y),
-                        font.as_ref().clone(),
-                        text_font_size,
-                        &line,
-                        false,
-                        TextDirection::Auto,
-                    );
-                    current_y += line_height;
-                    line = word.to_string();
-                } else {
-                    line = test_line;
-                }
-            }
-
-            // Draw remaining line
-            if !line.is_empty() {
-                surface.draw_text(
-                    Point::from_xy(center_x, current_y),
-                    font.as_ref().clone(),
-                    text_font_size,
-                    &line,
-                    false,
-                    TextDirection::Auto,
-                );
-                current_y += line_height;
-            }
+        // Draw description text
+        let lines = wrap_text(&config.cover_page.description, content_width, text_font_size);
+        for line in lines {
+            surface.draw_text(
+                Point::from_xy(margin_left, current_y),
+                font.as_ref().clone(),
+                text_font_size,
+                &line,
+                false,
+                TextDirection::Auto,
+            );
+            current_y += line_height;
         }
 
-        current_y += 20.0; // Extra spacing after description
+        current_y += 30.0; // Extra spacing after description
     }
 
     // Render location/URL
     if !config.cover_page.location.is_empty() {
         let text_font_size = config.cover_page.text_font_size as f32;
+        let location_text = format!("Location: {}", config.cover_page.location);
 
-        surface.draw_text(
-            Point::from_xy(center_x, current_y),
-            font.as_ref().clone(),
-            text_font_size,
-            &format!("Location: {}", config.cover_page.location),
-            false,
-            TextDirection::Auto,
-        );
-        current_y += text_font_size + 20.0;
+        // Wrap location if it's too long
+        let lines = wrap_text(&location_text, content_width, text_font_size);
+        let line_height = text_font_size * 1.5;
+        for line in lines {
+            surface.draw_text(
+                Point::from_xy(margin_left, current_y),
+                font.as_ref().clone(),
+                text_font_size,
+                &line,
+                false,
+                TextDirection::Auto,
+            );
+            current_y += line_height;
+        }
+        current_y += 10.0;
     }
 
     // Render date (auto-generate if empty)
@@ -123,94 +130,192 @@ pub fn render_cover_page(
 
     let text_font_size = config.cover_page.text_font_size as f32;
     surface.draw_text(
-        Point::from_xy(center_x, current_y),
+        Point::from_xy(margin_left, current_y),
         font.as_ref().clone(),
         text_font_size,
         &format!("Date: {}", date_text),
         false,
         TextDirection::Auto,
     );
-    current_y += text_font_size + 40.0;
 
-    // Render table of contents if enabled
-    if config.cover_page.include_toc && !config.expanded_files.is_empty() {
-        // Draw TOC header
-        let toc_font_size = config.cover_page.text_font_size as f32 + 2.0;
+    Ok(())
+}
+
+/// Renders the table of contents on its own page(s)
+/// Returns the number of TOC pages rendered (0 if TOC is disabled or no files)
+pub fn render_toc_page(
+    font_manager: &mut FontManager,
+    config: &Config,
+    surface: &mut Surface,
+    margin_left: f32,
+    margin_top: f32,
+    content_width: f32,
+    content_height: f32,
+    start_index: usize,
+) -> Result<usize> {
+    if !config.cover_page.include_toc || config.expanded_files.is_empty() {
+        return Ok(0);
+    }
+
+    let font_family = &config.cover_page.font_family;
+    let font = font_manager.get_cover_font(font_family)?;
+    let bold_font = font_manager.get_cover_bold_font(font_family)?;
+    let mut current_y = margin_top;
+    let max_y = margin_top + content_height - 20.0;
+
+    // Draw TOC header (only on first TOC page)
+    if start_index == 0 {
+        let toc_font_size = config.cover_page.text_font_size as f32 + 4.0;
+        let header_text = "Table of Contents";
+        let header_width = estimate_text_width(header_text, toc_font_size);
+        let header_x = margin_left + (content_width - header_width) / 2.0;
+
         surface.draw_text(
-            Point::from_xy(center_x, current_y),
-            font.as_ref().clone(),
+            Point::from_xy(header_x.max(margin_left), current_y),
+            bold_font.as_ref().clone(),
             toc_font_size,
-            "Table of Contents",
+            header_text,
             false,
             TextDirection::Auto,
         );
         current_y += toc_font_size + 15.0;
 
         // Draw separator line
-        let separator_y = current_y;
-        let separator_start_x = center_x - 100.0;
-        let separator_end_x = center_x + 100.0;
+        draw_separator_line(surface, margin_left, margin_left + content_width, current_y);
+        current_y += 25.0;
+    }
 
-        let mut path_builder = PathBuilder::new();
-        path_builder.move_to(separator_start_x, separator_y);
-        path_builder.line_to(separator_end_x, separator_y);
-        if let Some(separator_path) = path_builder.finish() {
-            surface.set_stroke(Some(Stroke {
-                paint: rgb_to_paint(100, 100, 100),
-                width: 0.5,
-                ..Default::default()
-            }));
-            surface.draw_path(&separator_path);
-            surface.set_stroke(None);
+    // List files
+    let list_font_size = config.cover_page.text_font_size as f32;
+    let line_height = list_font_size * 1.6;
+    let mut files_rendered = 0;
+
+    for (idx, file_entry) in config.expanded_files.iter().enumerate().skip(start_index) {
+        // Check if we're running out of space
+        if current_y + line_height > max_y {
+            // Return number of files we rendered - caller will create new page
+            return Ok(files_rendered);
         }
 
-        current_y += 20.0;
+        // Get the display path - use relative path if available, otherwise filename
+        let display_path = file_entry.path
+            .to_string_lossy()
+            .to_string();
 
-        // List files (limit to avoid overflowing the page)
-        let max_toc_entries = 30;
-        let list_font_size = config.cover_page.text_font_size as f32 - 1.0;
-        let line_height = list_font_size * 1.4;
+        let toc_entry = format!("{:>3}. {}", idx + 1, display_path);
 
-        for (idx, file_entry) in config.expanded_files.iter().take(max_toc_entries).enumerate() {
-            let filename = file_entry.path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("Unknown");
+        // Truncate if too long for the page
+        let max_chars = estimate_max_chars(content_width, list_font_size);
+        let truncated_entry = if toc_entry.len() > max_chars {
+            format!("{}...", &toc_entry[..max_chars.saturating_sub(3)])
+        } else {
+            toc_entry
+        };
 
-            let toc_entry = format!("{}. {}", idx + 1, filename);
+        surface.draw_text(
+            Point::from_xy(margin_left, current_y),
+            font.as_ref().clone(),
+            list_font_size,
+            &truncated_entry,
+            false,
+            TextDirection::Auto,
+        );
+        current_y += line_height;
+        files_rendered += 1;
+    }
 
-            // Left-aligned for TOC entries
-            let toc_x = margin_left + 50.0;
-            surface.draw_text(
-                Point::from_xy(toc_x, current_y),
-                font.as_ref().clone(),
-                list_font_size,
-                &toc_entry,
-                false,
-                TextDirection::Auto,
-            );
-            current_y += line_height;
+    // If we rendered all files, return a special value to indicate completion
+    Ok(files_rendered)
+}
 
-            // Check if we're running out of space
-            if current_y > margin_top + content_height - 50.0 {
-                break;
+/// Check if TOC should be rendered
+pub fn should_render_toc(config: &Config) -> bool {
+    config.cover_page.include_toc && !config.expanded_files.is_empty()
+}
+
+/// Get total number of files for TOC
+pub fn get_toc_file_count(config: &Config) -> usize {
+    config.expanded_files.len()
+}
+
+/// Estimate text width based on font size for proportional fonts
+fn estimate_text_width(text: &str, font_size: f32) -> f32 {
+    // For proportional fonts like Times New Roman, average character width
+    // is approximately 0.5 * font_size (varies by character)
+    text.len() as f32 * font_size * 0.5
+}
+
+/// Estimate maximum characters that fit in a given width for proportional fonts
+fn estimate_max_chars(width: f32, font_size: f32) -> usize {
+    // Use a conservative estimate for proportional fonts
+    // Average char width ~0.5 * font_size, but we use 0.45 to be safe
+    (width / (font_size * 0.45)) as usize
+}
+
+/// Wrap text to fit within a given width
+/// Treats double newlines as paragraph breaks, single newlines as spaces
+fn wrap_text(text: &str, max_width: f32, font_size: f32) -> Vec<String> {
+    let max_chars = estimate_max_chars(max_width, font_size);
+    let mut lines = Vec::new();
+
+    // Split by double newlines to get paragraphs, treating single newlines as spaces
+    let paragraphs: Vec<&str> = text.split("\n\n").collect();
+
+    for (para_idx, paragraph) in paragraphs.iter().enumerate() {
+        // Replace single newlines with spaces within a paragraph
+        let normalized = paragraph.replace('\n', " ");
+        let trimmed = normalized.trim();
+
+        if trimmed.is_empty() {
+            if para_idx > 0 {
+                lines.push(String::new()); // Empty line between paragraphs
+            }
+            continue;
+        }
+
+        let words: Vec<&str> = trimmed.split_whitespace().collect();
+        let mut current_line = String::new();
+
+        for word in words {
+            let test_line = if current_line.is_empty() {
+                word.to_string()
+            } else {
+                format!("{} {}", current_line, word)
+            };
+
+            if test_line.len() > max_chars && !current_line.is_empty() {
+                lines.push(current_line);
+                current_line = word.to_string();
+            } else {
+                current_line = test_line;
             }
         }
 
-        // If there are more files than we showed
-        if config.expanded_files.len() > max_toc_entries {
-            let remaining = config.expanded_files.len() - max_toc_entries;
-            let toc_x = margin_left + 50.0;
-            surface.draw_text(
-                Point::from_xy(toc_x, current_y),
-                font.as_ref().clone(),
-                list_font_size,
-                &format!("... and {} more files", remaining),
-                false,
-                TextDirection::Auto,
-            );
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+
+        // Add empty line after paragraph (except for last one)
+        if para_idx < paragraphs.len() - 1 {
+            lines.push(String::new());
         }
     }
 
-    Ok(())
+    lines
+}
+
+/// Draw a horizontal separator line
+fn draw_separator_line(surface: &mut Surface, start_x: f32, end_x: f32, y: f32) {
+    let mut path_builder = PathBuilder::new();
+    path_builder.move_to(start_x, y);
+    path_builder.line_to(end_x, y);
+    if let Some(separator_path) = path_builder.finish() {
+        surface.set_stroke(Some(Stroke {
+            paint: rgb_to_paint(150, 150, 150),
+            width: 0.5,
+            ..Default::default()
+        }));
+        surface.draw_path(&separator_path);
+        surface.set_stroke(None);
+    }
 }

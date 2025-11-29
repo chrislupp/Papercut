@@ -162,23 +162,6 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     let mut surface = page.surface();
     let mut current_y = ctx.margin_top;
 
-    // Add document title if present
-    if !config.metadata.title.is_empty() {
-        let title_x = ctx.margin_left + ctx.content_width / 2.0;
-        let title_y = current_y + 14.0;
-
-        surface.draw_text(
-            Point::from_xy(title_x, title_y),
-            font.as_ref().clone(),
-            14.0,
-            &config.metadata.title,
-            false,
-            TextDirection::Auto,
-        );
-
-        current_y += 25.0;
-    }
-
     // Render cover page if enabled
     if config.cover_page.enabled {
         cover_page::render_cover_page(
@@ -191,9 +174,41 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
             ctx.content_height,
         )?;
 
-        // Finish cover page and start a new page for content
+        // Finish cover page and start a new page
         surface.finish();
         page.finish();
+
+        // Render TOC on separate page(s) if enabled
+        if cover_page::should_render_toc(&config) {
+            let total_files = cover_page::get_toc_file_count(&config);
+            let mut toc_start_index = 0;
+
+            while toc_start_index < total_files {
+                page = ctx.document.start_page_with(ctx.page_settings());
+                surface = page.surface();
+
+                let files_rendered = cover_page::render_toc_page(
+                    &mut ctx.font_manager,
+                    &config,
+                    &mut surface,
+                    ctx.margin_left,
+                    ctx.margin_top,
+                    ctx.content_width,
+                    ctx.content_height,
+                    toc_start_index,
+                )?;
+
+                surface.finish();
+                page.finish();
+
+                toc_start_index += files_rendered;
+
+                // Safety check to prevent infinite loop
+                if files_rendered == 0 {
+                    break;
+                }
+            }
+        }
 
         page = ctx.document.start_page_with(ctx.page_settings());
         surface = page.surface();
@@ -685,7 +700,7 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let mut surface = page.surface();
         let mut current_y = ctx.margin_top;
 
-        // Render cover page if enabled
+        // Render cover page if enabled (skip TOC in multiple mode - each file is separate)
         if config.cover_page.enabled {
             cover_page::render_cover_page(
                 &mut ctx.font_manager,
