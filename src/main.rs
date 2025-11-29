@@ -74,11 +74,22 @@ fn main() -> Result<()> {
     let warning_manager = Arc::new(WarningManager::new(warnings_enabled));
 
     // Configure warning categories based on config
-    for category_str in &config.warnings.silence_categories {
-        if let Some(category) = WarningCategory::from_str(category_str) {
-            warning_manager.silence_category(category);
-        } else if args.verbose {
-            eprintln!("Warning: Unknown warning category '{}' in config", category_str);
+    let (known_categories, unknown_categories): (Vec<_>, Vec<_>) = config
+        .warnings
+        .silence_categories
+        .iter()
+        .map(|s| (s, WarningCategory::from_str(s)))
+        .partition(|(_, cat)| cat.is_some());
+
+    let categories: Vec<_> = known_categories
+        .into_iter()
+        .filter_map(|(_, cat)| cat)
+        .collect();
+    warning_manager.silence_categories(&categories);
+
+    if args.verbose {
+        for (name, _) in unknown_categories {
+            eprintln!("Warning: Unknown warning category '{}' in config", name);
         }
     }
 

@@ -49,13 +49,6 @@ impl WarningManager {
         }
     }
 
-    /// Silence a specific category of warnings
-    pub fn silence_category(&self, category: WarningCategory) {
-        if let Ok(mut silenced) = self.silenced_categories.lock() {
-            silenced.insert(category);
-        }
-    }
-
     /// Silence multiple categories at once
     pub fn silence_categories(&self, categories: &[WarningCategory]) {
         if let Ok(mut silenced) = self.silenced_categories.lock() {
@@ -129,9 +122,9 @@ mod tests {
     }
 
     #[test]
-    fn test_silence_category() {
+    fn test_silence_single_category() {
         let manager = WarningManager::new(true);
-        manager.silence_category(WarningCategory::Fonts);
+        manager.silence_categories(&[WarningCategory::Fonts]);
         assert!(manager.is_category_silenced(WarningCategory::Fonts));
         assert!(!manager.is_category_silenced(WarningCategory::Themes));
     }
