@@ -55,3 +55,11 @@ metadata:
   title: "Project Source Code Documentation"
   author: "Development Team"
   keywords: ["source", "code", "documentation"]
+
+cover_page:
+  enabled: true
+  title: "Project Source Code"
+  authors: "Development Team"
+  description: "Complete source code and configuration files."
+  location: "https://github.com/your-org/project"
+  include_toc: true

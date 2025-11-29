@@ -71,7 +71,7 @@ page:
   # - A4: 210mm x 297mm (common in Europe, Asia)
   # - Letter: 8.5" x 11" (common in North America)
   # - Legal: 8.5" x 14" (common for legal documents)
-  size: A4
+  size: Letter
 
   # Page margins in centimeters
   margins:
@@ -163,3 +163,50 @@ metadata:
     - documentation
     - review
     - internal
+
+# ===== COVER PAGE CONFIGURATION =====
+cover_page:
+  # Enable or disable the cover page
+  # When enabled, a cover page is added before the code content
+  enabled: true
+
+  # Main title displayed prominently on the cover page
+  title: "Source Code Documentation"
+
+  # Author(s) displayed below the title (supports single string or list)
+  # Single author: authors: "John Doe"
+  # Multiple authors (shown one per line):
+  authors:
+    - "Engineering Team"
+    - "Documentation Team"
+
+  # Description text (supports multiple lines)
+  # Automatically wraps to fit the page width
+  description: |
+    Complete source code listing for the Papercut project.
+
+    This document contains all source files, configuration examples,
+    and documentation for code review purposes.
+
+  # Location/URL where the source code is kept
+  # Typically a repository URL or file path
+  location: "https://github.com/your-org/papercut"
+
+  # Date to display on the cover page
+  # Leave empty to auto-generate current date (YYYY-MM-DD format)
+  # Or specify a custom date string
+  date: ""
+
+  # Include table of contents listing all files
+  # Shows up to 30 files with "...and X more" if there are more
+  include_toc: true
+
+  # Font size for the title (in points)
+  title_font_size: 24
+
+  # Font size for description and other text (in points)
+  text_font_size: 12
+
+  # Font family for the cover page (default: Times New Roman)
+  # Common options: "Times New Roman", "Georgia", "Arial", "Helvetica"
+  font_family: "Times New Roman"

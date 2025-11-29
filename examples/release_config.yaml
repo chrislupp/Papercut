@@ -63,3 +63,21 @@ metadata:
     - source code
     - distribution unlimited
     - approved
+
+cover_page:
+  enabled: true
+  title: "Software Source Code"
+  authors:
+    - "Software Engineering Division"
+    - "Quality Assurance Team"
+  description: |
+    APPROVED FOR PUBLIC RELEASE
+    Distribution Unlimited
+
+    This document contains the complete source code for the software package.
+    All code has been reviewed and cleared for public distribution.
+  location: "https://github.com/your-org/released-software"
+  date: "2024-12-01"
+  include_toc: true
+  title_font_size: 28
+  text_font_size: 11

@@ -11,3 +11,8 @@ files:
   - path: src/main.rs
   - path: src/config.rs
   - path: README.md
+
+# Simple cover page (most fields use defaults)
+cover_page:
+  enabled: true
+  title: "My Project"
