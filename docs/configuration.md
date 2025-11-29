@@ -263,12 +263,12 @@ styling:
 
 ## Metadata Configuration
 
-PDF document metadata.
+PDF document metadata. Title and author automatically fall back to cover page values if not specified.
 
 ```yaml
 metadata:
-  title: "Source Code Documentation"
-  author: "Engineering Team"
+  # title: "..."      # Falls back to cover_page.title if empty
+  # author: "..."     # Falls back to cover_page.authors (joined) if empty
   subject: "Code Review"
   keywords:
     - source code
@@ -277,9 +277,9 @@ metadata:
 
 ### Fields
 
-- **title** (optional): PDF document title
+- **title** (optional): PDF document title. Falls back to `cover_page.title` if not specified.
 
-- **author** (optional): PDF document author
+- **author** (optional): PDF document author. Falls back to `cover_page.authors` (comma-separated) if not specified.
 
 - **subject** (optional): PDF document subject
 
@@ -304,7 +304,7 @@ cover_page:
   include_toc: true           # Table of contents (on separate page)
   title_font_size: 24
   text_font_size: 12
-  font_family: "Times New Roman"        # Cover page font
+  font_family: "Arial"                  # Cover page font
 ```
 
 ### Fields
@@ -349,9 +349,9 @@ cover_page:
 
 - **text_font_size** (optional, default: `12`): Font size for description and other text in points
 
-- **font_family** (optional, default: `"Times New Roman"`): Font family for the cover page
-  - Common options: "Times New Roman", "Georgia", "Arial", "Helvetica"
-  - Falls back to Times New Roman if the specified font is not available
+- **font_family** (optional, default: `"Arial"`): Font family for the cover page
+  - Common options: "Arial", "Helvetica", "Times New Roman", "Georgia"
+  - Falls back to Arial if the specified font is not available
   - The title and "Description" heading are rendered in bold
 
 ### Examples

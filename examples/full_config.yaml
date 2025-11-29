@@ -1,5 +1,5 @@
 # Papercut - Full Configuration Example
-# This file demonstrates ALL available configuration options
+# This file demonstrates all available configuration options
 # Run from repo root: cargo run --release -- -c examples/full_config.yaml
 
 # ===== OUTPUT CONFIGURATION =====
@@ -59,10 +59,8 @@ syntax_highlighting:
   enabled: true
 
   # Syntax highlighting theme name
-  # Available themes depend on syntect library
-  # Popular themes: "base16-ocean.dark", "base16-ocean.light",
-  #                 "InspiredGitHub", "Solarized (dark)", "Solarized (light)"
   # Run 'papercut --list-themes' to see all available themes
+  # Built-in presets: vscode-dark, vscode-light, jetbrains-darcula, jetbrains-light
   theme: vscode-light
 
 # ===== PAGE SETTINGS =====
@@ -89,85 +87,38 @@ page:
 
   # Line spacing multiplier
   # 1.0 = single spacing, 1.5 = 1.5x spacing, 2.0 = double spacing
-  # Typical values: 1.0-1.5
   line_spacing: 1.2
 
-# ===== HEADER CONFIGURATION =====
-header:
-  # Enable or disable page headers
-  enabled: true
+  # Wrap long lines that exceed the page width
+  wrap_long_lines: true
 
-  # Header text alignment: left, center, right
-  # Supports variable substitution:
-  # - {page}: Current page number
-  # - {total}: Total number of pages
-  # - {filename}: Current source file name
-  # - {date}: Current date (YYYY-MM-DD format)
-  left: "CONFIDENTIAL - Internal Use Only"
-  center: ""
-  right: "Page {page} of {total}"
+  # Number of spaces to indent wrapped continuation lines
+  wrap_indent: 4
 
-  # Font size for header text (in points)
-  font_size: 8
+  # Show vertical borders on left and right of code area
+  vertical_borders: false
 
-# ===== FOOTER CONFIGURATION =====
-footer:
-  # Enable or disable page footers
-  enabled: true
-
-  # Footer text alignment: left, center, right
-  # Supports the same variable substitution as headers
-  left: "Generated: {date}"
-  center: "{filename}"
-  right: "© 2024 Your Company"
-
-  # Font size for footer text (in points)
-  font_size: 8
-
-# ===== STYLING OPTIONS =====
-styling:
-  # Font family for code rendering
-  # Options: monospace, courier, dejavu
-  # - monospace: Generic monospace font
-  # - courier: Courier New font
-  # - dejavu: DejaVu Sans Mono font
-  font_family: monospace
-
-  # Background color for code blocks (hex color format)
-  # Use "#ffffff" for white, "#f5f5f5" for light gray, etc.
-  background_color: "#ffffff"
-
-  # Text color for code (hex color format)
-  # Use "#000000" for black, "#2e3440" for dark gray, etc.
-  # Note: This is overridden when syntax highlighting is enabled
-  text_color: "#000000"
-
-  # Color for line numbers (hex color format)
-  line_number_color: "#888888"
+  # Show a separator line between line numbers and code
+  line_number_separator: true
 
 # ===== PDF METADATA =====
+# Note: title and author automatically fall back to cover_page values if not specified
 metadata:
-  # PDF document title (appears in PDF properties)
-  title: "Source Code Documentation"
-
-  # PDF document author (appears in PDF properties)
-  author: "Engineering Team"
+  # title: "..."      # Falls back to cover_page.title
+  # author: "..."     # Falls back to cover_page.authors (comma-separated)
 
   # PDF document subject (appears in PDF properties)
   subject: "Code Review and Documentation"
 
   # PDF document keywords (array of strings)
-  # Useful for searchability and organization
   keywords:
     - source code
     - documentation
     - review
-    - internal
 
 # ===== COVER PAGE CONFIGURATION =====
 cover_page:
   # Enable or disable the cover page
-  # When enabled, a cover page is added before the code content
   enabled: true
 
   # Main title displayed prominently on the cover page
@@ -189,16 +140,13 @@ cover_page:
     and documentation for code review purposes.
 
   # Location/URL where the source code is kept
-  # Typically a repository URL or file path
   location: "https://github.com/your-org/papercut"
 
   # Date to display on the cover page
   # Leave empty to auto-generate current date (YYYY-MM-DD format)
-  # Or specify a custom date string
   date: ""
 
   # Include table of contents listing all files
-  # Shows up to 30 files with "...and X more" if there are more
   include_toc: true
 
   # Font size for the title (in points)
@@ -207,6 +155,6 @@ cover_page:
   # Font size for description and other text (in points)
   text_font_size: 12
 
-  # Font family for the cover page (default: Times New Roman)
-  # Common options: "Times New Roman", "Georgia", "Arial", "Helvetica"
-  font_family: "Times New Roman"
+  # Font family for the cover page (default: Arial)
+  # Common options: "Arial", "Helvetica", "Times New Roman", "Georgia"
+  font_family: "Arial"
