@@ -240,7 +240,7 @@ pub fn get_toc_file_count(config: &Config) -> usize {
 
 /// Estimate text width based on font size for proportional fonts
 fn estimate_text_width(text: &str, font_size: f32) -> f32 {
-    // For proportional fonts like Times New Roman, average character width
+    // For proportional fonts like Arial, average character width
     // is approximately 0.5 * font_size (varies by character)
     text.len() as f32 * font_size * 0.5
 }

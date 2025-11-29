@@ -62,7 +62,7 @@ impl FontManager {
         ))
     }
 
-    /// Get or load a cover page font (serif font like Times New Roman)
+    /// Get or load a cover page font (sans-serif font like Arial)
     pub fn get_cover_font(&mut self, font_family: &str) -> Result<Arc<Font>> {
         if let Some(font) = &self.cover_font {
             return Ok(Arc::clone(font));
@@ -71,22 +71,22 @@ impl FontManager {
         // Try the specified font first, then fallbacks
         let font_families = if font_family.is_empty() {
             vec![
-                "Times New Roman",
-                "Times",
-                "Georgia",
-                "DejaVu Serif",
-                "Liberation Serif",
-                "serif",
+                "Arial",
+                "Helvetica Neue",
+                "Helvetica",
+                "DejaVu Sans",
+                "Liberation Sans",
+                "sans-serif",
             ]
         } else {
             vec![
                 font_family,
-                "Times New Roman",
-                "Times",
-                "Georgia",
-                "DejaVu Serif",
-                "Liberation Serif",
-                "serif",
+                "Arial",
+                "Helvetica Neue",
+                "Helvetica",
+                "DejaVu Sans",
+                "Liberation Sans",
+                "sans-serif",
             ]
         };
 
@@ -108,27 +108,30 @@ impl FontManager {
             return Ok(Arc::clone(font));
         }
 
-        // Try the specified font first, then fallbacks
-        let font_families = if font_family.is_empty() {
-            vec![
-                "Times New Roman",
-                "Times",
-                "Georgia",
-                "DejaVu Serif",
-                "Liberation Serif",
-                "serif",
-            ]
-        } else {
-            vec![
-                font_family,
-                "Times New Roman",
-                "Times",
-                "Georgia",
-                "DejaVu Serif",
-                "Liberation Serif",
-                "serif",
-            ]
-        };
+        // Build list of fonts to try for bold variant
+        // Always include common fonts with reliable bold variants
+        let mut font_families = Vec::new();
+
+        // First try the user-specified font if provided
+        if !font_family.is_empty() {
+            font_families.push(font_family);
+        }
+
+        // Then try fonts known to have good bold variants
+        let fallbacks = [
+            "Arial",           // Windows/macOS - has proper bold
+            "Helvetica Neue",  // macOS - has proper bold
+            "DejaVu Sans",     // Linux - has proper bold
+            "Liberation Sans", // Linux - has proper bold
+            "Helvetica",       // Try last as it may not have bold
+            "sans-serif",
+        ];
+
+        for fallback in fallbacks {
+            if fallback != font_family {
+                font_families.push(fallback);
+            }
+        }
 
         for family in font_families {
             if let Some(font) = self.try_load_bold_font(family) {
@@ -138,7 +141,7 @@ impl FontManager {
             }
         }
 
-        // Fall back to regular cover font if no bold available
+        // Fall back to regular cover font if no bold available anywhere
         self.get_cover_font(font_family)
     }
 
@@ -164,17 +167,18 @@ impl FontManager {
         let id = self.db.query(&query)?;
         let face = self.db.face(id)?;
 
-        // Load the font data
+        // Load the font data, using the correct index for TTC (TrueType Collection) files
+        let font_index = face.index;
         match &face.source {
             Source::Binary(data) => {
                 // Try to create a Font from the binary data
                 let vec_data = data.as_ref().as_ref().to_vec();
-                Font::new(vec_data.into(), 0)
+                Font::new(vec_data.into(), font_index)
             }
             Source::File(path) => {
                 // Read font file and create Font
                 match std::fs::read(path) {
-                    Ok(data) => Font::new(data.into(), 0),
+                    Ok(data) => Font::new(data.into(), font_index),
                     Err(e) => {
                         self.warning_manager.warnf(
                             WarningCategory::Fonts,
@@ -187,7 +191,7 @@ impl FontManager {
             Source::SharedFile(path, _) => {
                 // Read font file and create Font
                 match std::fs::read(path) {
-                    Ok(data) => Font::new(data.into(), 0),
+                    Ok(data) => Font::new(data.into(), font_index),
                     Err(e) => {
                         self.warning_manager.warnf(
                             WarningCategory::Fonts,
