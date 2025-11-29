@@ -281,6 +281,9 @@ pub struct CoverPageConfig {
     /// Title to display on the cover page
     #[serde(default)]
     pub title: String,
+    /// Authors to display on the cover page (supports single string or list)
+    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    pub authors: Vec<String>,
     /// Description text for the cover page
     #[serde(default)]
     pub description: String,
@@ -299,6 +302,9 @@ pub struct CoverPageConfig {
     /// Font size for the description and other text
     #[serde(default = "default_cover_text_font_size")]
     pub text_font_size: u8,
+    /// Font family for the cover page (default: Times New Roman)
+    #[serde(default = "default_cover_font_family")]
+    pub font_family: String,
 }
 
 impl Default for CoverPageConfig {
@@ -306,14 +312,73 @@ impl Default for CoverPageConfig {
         Self {
             enabled: false,
             title: String::new(),
+            authors: Vec::new(),
             description: String::new(),
             location: String::new(),
             date: String::new(),
             include_toc: true,
             title_font_size: default_cover_title_font_size(),
             text_font_size: default_cover_text_font_size(),
+            font_family: default_cover_font_family(),
         }
     }
+}
+
+/// Deserialize a field that can be either a single string or a list of strings
+fn deserialize_string_or_vec<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, SeqAccess, Visitor};
+    use std::fmt;
+
+    struct StringOrVec;
+
+    impl<'de> Visitor<'de> for StringOrVec {
+        type Value = Vec<String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or a list of strings")
+        }
+
+        fn visit_str<E>(self, value: &str) -> std::result::Result<Vec<String>, E>
+        where
+            E: de::Error,
+        {
+            if value.is_empty() {
+                Ok(Vec::new())
+            } else {
+                Ok(vec![value.to_string()])
+            }
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Vec<String>, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut vec = Vec::new();
+            while let Some(item) = seq.next_element()? {
+                vec.push(item);
+            }
+            Ok(vec)
+        }
+
+        fn visit_none<E>(self) -> std::result::Result<Vec<String>, E>
+        where
+            E: de::Error,
+        {
+            Ok(Vec::new())
+        }
+
+        fn visit_unit<E>(self) -> std::result::Result<Vec<String>, E>
+        where
+            E: de::Error,
+        {
+            Ok(Vec::new())
+        }
+    }
+
+    deserializer.deserialize_any(StringOrVec)
 }
 
 // Default value functions
@@ -395,6 +460,10 @@ fn default_cover_title_font_size() -> u8 {
 
 fn default_cover_text_font_size() -> u8 {
     12
+}
+
+fn default_cover_font_family() -> String {
+    "Times New Roman".to_string()
 }
 
 impl Config {
