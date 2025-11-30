@@ -183,6 +183,7 @@ pub struct TocLink {
 ///
 /// Parameters:
 /// - `file_pages`: Pre-calculated page indices for each file (for hyperlinks)
+#[allow(clippy::too_many_arguments)]
 pub fn render_toc_page(
     font_manager: &mut FontManager,
     config: &Config,
