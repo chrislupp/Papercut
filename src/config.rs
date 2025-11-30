@@ -376,7 +376,7 @@ pub enum FontFamily {
     DejaVu,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct MetadataConfig {
     #[serde(default)]
     pub title: String,
@@ -386,17 +386,6 @@ pub struct MetadataConfig {
     pub subject: String,
     #[serde(default)]
     pub keywords: Vec<String>,
-}
-
-impl Default for MetadataConfig {
-    fn default() -> Self {
-        Self {
-            title: String::new(),
-            author: String::new(),
-            subject: String::new(),
-            keywords: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

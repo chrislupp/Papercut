@@ -130,12 +130,12 @@ fn should_overwrite_file(path: &Path, force: bool) -> Result<bool> {
     print!("File '{}' already exists. Overwrite? [y/N]: ", path.display());
     io::stdout()
         .flush()
-        .map_err(|e| PapercutError::Io(e))?;
+        .map_err(PapercutError::Io)?;
 
     let mut input = String::new();
     io::stdin()
         .read_line(&mut input)
-        .map_err(|e| PapercutError::Io(e))?;
+        .map_err(PapercutError::Io)?;
 
     Ok(input.trim().eq_ignore_ascii_case("y"))
 }
@@ -228,7 +228,7 @@ fn calculate_document_layout(config: &Config, ctx: &PdfContext) -> Result<Docume
                 current_page += 1; // First TOC page
                 let remaining = total_files - entries_first_page;
                 if entries_per_subsequent_page > 0 {
-                    current_page += (remaining + entries_per_subsequent_page - 1) / entries_per_subsequent_page;
+                    current_page += remaining.div_ceil(entries_per_subsequent_page);
                 }
             }
         }
@@ -1084,7 +1084,7 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let line_height = font_size * config.page.line_spacing;
         let lines_per_page = ((ctx.content_height) / line_height).floor() as usize;
         let total_pages = if lines_per_page > 0 {
-            let content_pages = (single_file_line_count + lines_per_page - 1) / lines_per_page;
+            let content_pages = single_file_line_count.div_ceil(lines_per_page);
             if config.cover_page.enabled { content_pages + 1 } else { content_pages.max(1) }
         } else {
             1

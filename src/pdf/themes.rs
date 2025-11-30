@@ -197,7 +197,7 @@ fn create_vscode_light_modern_theme() -> Theme {
     Theme {
         name: Some("VSCode Light Modern".to_string()),
         author: Some("Microsoft".to_string()),
-        settings: settings,
+        settings,
         scopes: items,
     }
 }

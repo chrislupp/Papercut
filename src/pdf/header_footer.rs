@@ -22,6 +22,7 @@ pub struct HeaderFooterContext<'a> {
 /// Parameters:
 /// - margin_left, margin_top, content_width: default page margins
 /// - page_width: total page width (needed for margin override calculations)
+#[allow(clippy::too_many_arguments)]
 pub fn render_header(
     surface: &mut Surface,
     font: Arc<Font>,
@@ -163,6 +164,7 @@ pub fn render_header(
 }
 
 /// Render footer on the given surface
+#[allow(clippy::too_many_arguments)]
 pub fn render_footer(
     surface: &mut Surface,
     font: Arc<Font>,
