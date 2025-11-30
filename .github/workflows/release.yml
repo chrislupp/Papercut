@@ -1,0 +1,247 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  release:
+    name: Create Release
+    if: github.event.pull_request.merged == true && (contains(github.event.pull_request.labels.*.name, 'release') || contains(github.event.pull_request.labels.*.name, 'prerelease'))
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.new_version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.labels.outputs.prerelease }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Setup GPG for signing
+        run: |
+          cat > /tmp/gpg_key <<EOF
+          %echo Generating a basic OpenPGP key
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 4096
+          Subkey-Type: RSA
+          Subkey-Length: 4096
+          Name-Real: github-actions[bot]
+          Name-Email: github-actions[bot]@users.noreply.github.com
+          Expire-Date: 0
+          %commit
+          %echo done
+          EOF
+          gpg --batch --generate-key /tmp/gpg_key
+          rm /tmp/gpg_key
+          echo "GPG key generated"
+
+          KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d'/' -f2)
+          git config --global user.signingkey $KEY_ID
+          git config --global commit.gpgsign true
+          git config --global tag.gpgsign true
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Extract and validate labels
+        id: labels
+        run: |
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          echo "Labels: $LABELS"
+
+          # Check release type
+          IS_RELEASE=$(echo "$LABELS" | jq 'map(select(. == "release")) | length')
+          IS_PRERELEASE=$(echo "$LABELS" | jq 'map(select(. == "prerelease")) | length')
+
+          if [ "$IS_RELEASE" -gt 0 ] && [ "$IS_PRERELEASE" -gt 0 ]; then
+            echo "::error::Cannot have both 'release' and 'prerelease' labels"
+            exit 1
+          fi
+
+          if [ "$IS_PRERELEASE" -gt 0 ]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check version bump type (exactly one required)
+          MAJOR=$(echo "$LABELS" | jq 'map(select(. == "major")) | length')
+          MINOR=$(echo "$LABELS" | jq 'map(select(. == "minor")) | length')
+          PATCH=$(echo "$LABELS" | jq 'map(select(. == "patch")) | length')
+
+          BUMP_COUNT=$((MAJOR + MINOR + PATCH))
+          if [ "$BUMP_COUNT" -ne 1 ]; then
+            echo "::error::Exactly one of 'major', 'minor', or 'patch' label is required"
+            exit 1
+          fi
+
+          if [ "$MAJOR" -eq 1 ]; then
+            echo "bump=major" >> $GITHUB_OUTPUT
+          elif [ "$MINOR" -eq 1 ]; then
+            echo "bump=minor" >> $GITHUB_OUTPUT
+          else
+            echo "bump=patch" >> $GITHUB_OUTPUT
+          fi
+
+          # Check prerelease type (required if prerelease)
+          if [ "$IS_PRERELEASE" -gt 0 ]; then
+            ALPHA=$(echo "$LABELS" | jq 'map(select(. == "alpha")) | length')
+            BETA=$(echo "$LABELS" | jq 'map(select(. == "beta")) | length')
+            RC=$(echo "$LABELS" | jq 'map(select(. == "rc")) | length')
+
+            PRE_COUNT=$((ALPHA + BETA + RC))
+            if [ "$PRE_COUNT" -ne 1 ]; then
+              echo "::error::Prerelease requires exactly one of 'alpha', 'beta', or 'rc' label"
+              exit 1
+            fi
+
+            if [ "$ALPHA" -eq 1 ]; then
+              echo "pretype=alpha" >> $GITHUB_OUTPUT
+            elif [ "$BETA" -eq 1 ]; then
+              echo "pretype=beta" >> $GITHUB_OUTPUT
+            else
+              echo "pretype=rc" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Calculate new version
+        id: version
+        run: |
+          # Parse current version from Cargo.toml
+          CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Current version: $CURRENT"
+
+          # Split version
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3 | cut -d- -f1)
+
+          # Apply bump
+          BUMP="${{ steps.labels.outputs.bump }}"
+          case "$BUMP" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+
+          # Handle prerelease
+          if [ "${{ steps.labels.outputs.prerelease }}" == "true" ]; then
+            PRETYPE="${{ steps.labels.outputs.pretype }}"
+
+            # Find existing prerelease tags for this version
+            EXISTING=$(git tag -l "v${NEW_VERSION}-${PRETYPE}.*" | sort -V | tail -1)
+            if [ -n "$EXISTING" ]; then
+              # Increment prerelease number
+              PRE_NUM=$(echo "$EXISTING" | sed "s/v${NEW_VERSION}-${PRETYPE}\.\([0-9]*\)/\1/")
+              PRE_NUM=$((PRE_NUM + 1))
+            else
+              PRE_NUM=1
+            fi
+
+            NEW_VERSION="${NEW_VERSION}-${PRETYPE}.${PRE_NUM}"
+          fi
+
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Update Cargo.toml
+        run: |
+          sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.new_version }}"/' Cargo.toml
+
+      - name: Update CHANGELOG.md
+        if: steps.labels.outputs.prerelease == 'false'
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          VERSION="${{ steps.version.outputs.new_version }}"
+
+          # Add new version section after [Unreleased]
+          awk -v ver="$VERSION" -v date="$DATE" '
+            /^## \[Unreleased\]/ {
+              print
+              print ""
+              print "## [" ver "] - " date
+              next
+            }
+            { print }
+          ' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
+
+      - name: Commit and tag
+        run: |
+          git add Cargo.toml CHANGELOG.md
+          git commit -S -m "chore: release version ${{ steps.version.outputs.new_version }}"
+          git tag -s "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin main
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Extract changelog for release
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.new_version }}"
+
+          # Extract section for this version
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]") || index($0, "[Unreleased]")) found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          # Write to file for release body
+          echo "$NOTES" > release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: release_notes.md
+          prerelease: ${{ steps.labels.outputs.prerelease == 'true' }}
+          draft: false
+
+  build-macos:
+    name: Build macOS DMG
+    needs: release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install dependencies
+        run: brew install librsvg create-dmg
+
+      - name: Build and package
+        run: |
+          cd packaging/macos
+          ./build-macos.sh
+          ./create-dmg.sh
+
+      - name: Upload DMG to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          files: dist/*.dmg
