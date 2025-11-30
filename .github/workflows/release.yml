@@ -4,6 +4,25 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+      prerelease:
+        description: 'Prerelease type (leave empty for stable release)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - alpha
+          - beta
+          - rc
 
 permissions:
   contents: write
@@ -11,7 +30,11 @@ permissions:
 jobs:
   release:
     name: Create Release
-    if: github.event.pull_request.merged == true && (contains(github.event.pull_request.labels.*.name, 'release') || contains(github.event.pull_request.labels.*.name, 'prerelease'))
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (contains(github.event.pull_request.labels.*.name, 'release') ||
+        contains(github.event.pull_request.labels.*.name, 'prerelease')))
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.new_version }}
@@ -53,6 +76,19 @@ jobs:
       - name: Extract and validate labels
         id: labels
         run: |
+          # Handle workflow_dispatch inputs
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "bump=${{ inputs.bump }}" >> $GITHUB_OUTPUT
+            if [ -n "${{ inputs.prerelease }}" ]; then
+              echo "prerelease=true" >> $GITHUB_OUTPUT
+              echo "pretype=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
+            else
+              echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
+            exit 0
+          fi
+
+          # Handle PR labels
           LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
           echo "Labels: $LABELS"
 
