@@ -3,7 +3,9 @@ use crate::error::{PapercutError, Result};
 use crate::pdf::krilla_doc::PdfContext;
 use crate::pdf::colors::{rgb_to_paint, syntect_to_paint};
 use crate::pdf::cover_page;
+use crate::pdf::header_footer::{self, HeaderFooterContext};
 use crate::warnings::WarningManager;
+use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use krilla::geom::{PathBuilder, Point};
 use krilla::num::NormalizedF32;
@@ -193,8 +195,16 @@ fn estimate_toc_entries_per_page(config: &Config, ctx: &PdfContext) -> usize {
     (available_height / line_height).floor() as usize
 }
 
-/// Calculate which page each file starts on (0-indexed)
-fn calculate_file_pages(config: &Config, ctx: &PdfContext) -> Result<Vec<usize>> {
+/// Document layout information for header/footer rendering
+pub struct DocumentLayout {
+    /// Page index where each file starts (0-indexed)
+    pub file_pages: Vec<usize>,
+    /// Total number of pages in the document
+    pub total_pages: usize,
+}
+
+/// Calculate which page each file starts on (0-indexed) and total page count
+fn calculate_document_layout(config: &Config, ctx: &PdfContext) -> Result<DocumentLayout> {
     let mut file_pages = Vec::new();
     let mut current_page: usize = 0;
     let mut current_y = ctx.margin_top;
@@ -262,7 +272,13 @@ fn calculate_file_pages(config: &Config, ctx: &PdfContext) -> Result<Vec<usize>>
         current_y += 10.0 + 15.0; // separator + spacing after file
     }
 
-    Ok(file_pages)
+    // Total pages is current_page + 1 (since current_page is 0-indexed)
+    let total_pages = current_page + 1;
+
+    Ok(DocumentLayout {
+        file_pages,
+        total_pages,
+    })
 }
 
 /// Main entry point for PDF generation
@@ -287,10 +303,17 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     let effective_metadata = config.effective_metadata();
     ctx.set_metadata(&effective_metadata);
 
-    // Pre-calculate which page each file starts on (for TOC hyperlinks)
-    let file_pages = calculate_file_pages(&config, &ctx)?;
+    // Pre-calculate document layout (page indices and total pages)
+    let layout = calculate_document_layout(&config, &ctx)?;
 
     let font = ctx.font_manager.get_monospace_font()?;
+    let hf_font = ctx.font_manager.get_header_footer_font()?;
+
+    // Initialize header/footer state
+    let mut current_page_num: usize = 1;
+    let total_pages = layout.total_pages;
+    let date_str = Local::now().format("%Y-%m-%d").to_string();
+    let mut current_filename = String::new();
 
     // Start first page
     let mut page = ctx.document.start_page_with(ctx.page_settings());
@@ -299,6 +322,29 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
 
     // Render cover page if enabled
     if config.cover_page.enabled {
+        // Use cover page header/footer if specified, otherwise use main header/footer
+        let cover_header = config.cover_page.header.as_ref().unwrap_or(&config.header);
+        let cover_footer = config.cover_page.footer.as_ref().unwrap_or(&config.footer);
+
+        // Render header on cover page
+        let hf_ctx = HeaderFooterContext {
+            page_number: current_page_num,
+            total_pages,
+            current_filename: &current_filename,
+            date: &date_str,
+        };
+        header_footer::render_header(
+            &mut surface,
+            hf_font.clone(),
+            cover_header,
+            &hf_ctx,
+            ctx.margin_left,
+            ctx.margin_top,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
+
         cover_page::render_cover_page(
             &mut ctx.font_manager,
             &config,
@@ -309,9 +355,24 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
             ctx.content_height,
         )?;
 
+        // Render footer on cover page
+        header_footer::render_footer(
+            &mut surface,
+            hf_font.clone(),
+            cover_footer,
+            &hf_ctx,
+            ctx.margin_left,
+            ctx.page_height_mm,
+            ctx.margin_bottom,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
+
         // Finish cover page and start a new page
         surface.finish();
         page.finish();
+        current_page_num += 1;
 
         // Render TOC on separate page(s) if enabled
         if cover_page::should_render_toc(&config) {
@@ -322,6 +383,25 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 page = ctx.document.start_page_with(ctx.page_settings());
                 surface = page.surface();
 
+                // Render header on TOC page
+                let hf_ctx = HeaderFooterContext {
+                    page_number: current_page_num,
+                    total_pages,
+                    current_filename: &current_filename,
+                    date: &date_str,
+                };
+                header_footer::render_header(
+                    &mut surface,
+                    hf_font.clone(),
+                    &config.header,
+                    &hf_ctx,
+                    ctx.margin_left,
+                    ctx.margin_top,
+                    ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+                )?;
+
                 let (files_rendered, toc_links) = cover_page::render_toc_page(
                     &mut ctx.font_manager,
                     &config,
@@ -331,7 +411,21 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                     ctx.content_width,
                     ctx.content_height,
                     toc_start_index,
-                    &file_pages,
+                    &layout.file_pages,
+                )?;
+
+                // Render footer on TOC page
+                header_footer::render_footer(
+                    &mut surface,
+                    hf_font.clone(),
+                    &config.footer,
+                    &hf_ctx,
+                    ctx.margin_left,
+                    ctx.page_height_mm,
+                    ctx.margin_bottom,
+                    ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
                 )?;
 
                 // Finish surface before adding annotations to page
@@ -341,6 +435,7 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 cover_page::add_toc_annotations(&mut page, toc_links, ctx.margin_left);
 
                 page.finish();
+                current_page_num += 1;
 
                 toc_start_index += files_rendered;
 
@@ -354,6 +449,44 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         page = ctx.document.start_page_with(ctx.page_settings());
         surface = page.surface();
         current_y = ctx.margin_top;
+
+        // Render header on first content page
+        let hf_ctx = HeaderFooterContext {
+            page_number: current_page_num,
+            total_pages,
+            current_filename: &current_filename,
+            date: &date_str,
+        };
+        header_footer::render_header(
+            &mut surface,
+            hf_font.clone(),
+            &config.header,
+            &hf_ctx,
+            ctx.margin_left,
+            ctx.margin_top,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
+    } else {
+        // No cover page - render header on first page
+        let hf_ctx = HeaderFooterContext {
+            page_number: current_page_num,
+            total_pages,
+            current_filename: &current_filename,
+            date: &date_str,
+        };
+        header_footer::render_header(
+            &mut surface,
+            hf_font.clone(),
+            &config.header,
+            &hf_ctx,
+            ctx.margin_left,
+            ctx.margin_top,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
     }
 
     // Create progress bar if processing multiple files and not in verbose mode
@@ -405,8 +538,9 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 source: e,
             })?;
 
-        // Get file path for header
+        // Get file path for header and update current filename for header/footer
         let file_path_str = file_entry.path.display().to_string();
+        current_filename = file_path_str.clone();
 
         // Add separator line above file header
         let mut path_builder = PathBuilder::new();
@@ -603,12 +737,53 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                             }
                         }
 
+                        // Render footer before finishing page
+                        let hf_ctx = HeaderFooterContext {
+                            page_number: current_page_num,
+                            total_pages,
+                            current_filename: &current_filename,
+                            date: &date_str,
+                        };
+                        header_footer::render_footer(
+                            &mut surface,
+                            hf_font.clone(),
+                            &config.footer,
+                            &hf_ctx,
+                            ctx.margin_left,
+                            ctx.page_height_mm,
+                            ctx.margin_bottom,
+                            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+                        )?;
+
                         surface.finish();
                         page.finish();
+                        current_page_num += 1;
+
                         page = ctx.document.start_page_with(ctx.page_settings());
                         surface = page.surface();
                         current_y = ctx.margin_top;
                         page_segment_start_y = ctx.margin_top;
+
+                        // Render header on new page
+                        let hf_ctx = HeaderFooterContext {
+                            page_number: current_page_num,
+                            total_pages,
+                            current_filename: &current_filename,
+                            date: &date_str,
+                        };
+                        header_footer::render_header(
+                            &mut surface,
+                            hf_font.clone(),
+                            &config.header,
+                            &hf_ctx,
+                            ctx.margin_left,
+                            ctx.margin_top,
+                            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+                        )?;
                     }
                 }
             }
@@ -714,12 +889,53 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                             }
                         }
 
+                        // Render footer before finishing page
+                        let hf_ctx = HeaderFooterContext {
+                            page_number: current_page_num,
+                            total_pages,
+                            current_filename: &current_filename,
+                            date: &date_str,
+                        };
+                        header_footer::render_footer(
+                            &mut surface,
+                            hf_font.clone(),
+                            &config.footer,
+                            &hf_ctx,
+                            ctx.margin_left,
+                            ctx.page_height_mm,
+                            ctx.margin_bottom,
+                            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+                        )?;
+
                         surface.finish();
                         page.finish();
+                        current_page_num += 1;
+
                         page = ctx.document.start_page_with(ctx.page_settings());
                         surface = page.surface();
                         current_y = ctx.margin_top;
                         page_segment_start_y = ctx.margin_top;
+
+                        // Render header on new page
+                        let hf_ctx = HeaderFooterContext {
+                            page_number: current_page_num,
+                            total_pages,
+                            current_filename: &current_filename,
+                            date: &date_str,
+                        };
+                        header_footer::render_header(
+                            &mut surface,
+                            hf_font.clone(),
+                            &config.header,
+                            &hf_ctx,
+                            ctx.margin_left,
+                            ctx.margin_top,
+                            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+                        )?;
                     }
                 }
             }
@@ -768,6 +984,26 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     if let Some(pb) = progress {
         pb.finish_with_message("Processing complete");
     }
+
+    // Render footer on last page
+    let hf_ctx = HeaderFooterContext {
+        page_number: current_page_num,
+        total_pages,
+        current_filename: &current_filename,
+        date: &date_str,
+    };
+    header_footer::render_footer(
+        &mut surface,
+        hf_font.clone(),
+        &config.footer,
+        &hf_ctx,
+        ctx.margin_left,
+        ctx.page_height_mm,
+        ctx.margin_bottom,
+        ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+    )?;
 
     // Finish last page
     surface.finish();
@@ -836,6 +1072,28 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         ctx.set_metadata(&effective_metadata);
 
         let font = ctx.font_manager.get_monospace_font()?;
+        let hf_font = ctx.font_manager.get_header_footer_font()?;
+
+        // For multiple mode, calculate pages for this single file
+        // Create a temporary config with just this file to calculate layout
+        let single_file_line_count = {
+            let content = fs::read_to_string(&file_entry.path).unwrap_or_default();
+            count_wrapped_lines(&content, &config, &ctx)
+        };
+        let font_size = config.page.font_size as f32;
+        let line_height = font_size * config.page.line_spacing;
+        let lines_per_page = ((ctx.content_height) / line_height).floor() as usize;
+        let total_pages = if lines_per_page > 0 {
+            let content_pages = (single_file_line_count + lines_per_page - 1) / lines_per_page;
+            if config.cover_page.enabled { content_pages + 1 } else { content_pages.max(1) }
+        } else {
+            1
+        };
+
+        // Initialize header/footer state for this file
+        let mut current_page_num: usize = 1;
+        let date_str = Local::now().format("%Y-%m-%d").to_string();
+        let current_filename = file_entry.path.display().to_string();
 
         // Start page
         let mut page = ctx.document.start_page_with(ctx.page_settings());
@@ -844,6 +1102,29 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
 
         // Render cover page if enabled (skip TOC in multiple mode - each file is separate)
         if config.cover_page.enabled {
+            // Use cover page header/footer if specified, otherwise use main header/footer
+            let cover_header = config.cover_page.header.as_ref().unwrap_or(&config.header);
+            let cover_footer = config.cover_page.footer.as_ref().unwrap_or(&config.footer);
+
+            // Render header on cover page
+            let hf_ctx = HeaderFooterContext {
+                page_number: current_page_num,
+                total_pages,
+                current_filename: &current_filename,
+                date: &date_str,
+            };
+            header_footer::render_header(
+                &mut surface,
+                hf_font.clone(),
+                cover_header,
+                &hf_ctx,
+                ctx.margin_left,
+                ctx.margin_top,
+                ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+            )?;
+
             cover_page::render_cover_page(
                 &mut ctx.font_manager,
                 &config,
@@ -854,13 +1135,66 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                 ctx.content_height,
             )?;
 
+            // Render footer on cover page
+            header_footer::render_footer(
+                &mut surface,
+                hf_font.clone(),
+                cover_footer,
+                &hf_ctx,
+                ctx.margin_left,
+                ctx.page_height_mm,
+                ctx.margin_bottom,
+                ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+            )?;
+
             // Finish cover page and start a new page for content
             surface.finish();
             page.finish();
+            current_page_num += 1;
 
             page = ctx.document.start_page_with(ctx.page_settings());
             surface = page.surface();
             current_y = ctx.margin_top;
+
+            // Render header on content page
+            let hf_ctx = HeaderFooterContext {
+                page_number: current_page_num,
+                total_pages,
+                current_filename: &current_filename,
+                date: &date_str,
+            };
+            header_footer::render_header(
+                &mut surface,
+                hf_font.clone(),
+                &config.header,
+                &hf_ctx,
+                ctx.margin_left,
+                ctx.margin_top,
+                ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+            )?;
+        } else {
+            // No cover page - render header on first page
+            let hf_ctx = HeaderFooterContext {
+                page_number: current_page_num,
+                total_pages,
+                current_filename: &current_filename,
+                date: &date_str,
+            };
+            header_footer::render_header(
+                &mut surface,
+                hf_font.clone(),
+                &config.header,
+                &hf_ctx,
+                ctx.margin_left,
+                ctx.margin_top,
+                ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+            )?;
         }
 
         // Check file size before reading
@@ -1022,12 +1356,53 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                         }
                     }
 
+                    // Render footer before finishing page
+                    let hf_ctx = HeaderFooterContext {
+                        page_number: current_page_num,
+                        total_pages,
+                        current_filename: &current_filename,
+                        date: &date_str,
+                    };
+                    header_footer::render_footer(
+                        &mut surface,
+                        hf_font.clone(),
+                        &config.footer,
+                        &hf_ctx,
+                        ctx.margin_left,
+                        ctx.page_height_mm,
+                        ctx.margin_bottom,
+                        ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+                    )?;
+
                     surface.finish();
                     page.finish();
+                    current_page_num += 1;
+
                     page = ctx.document.start_page_with(ctx.page_settings());
                     surface = page.surface();
                     current_y = ctx.margin_top;
                     page_segment_start_y = ctx.margin_top;
+
+                    // Render header on new page
+                    let hf_ctx = HeaderFooterContext {
+                        page_number: current_page_num,
+                        total_pages,
+                        current_filename: &current_filename,
+                        date: &date_str,
+                    };
+                    header_footer::render_header(
+                        &mut surface,
+                        hf_font.clone(),
+                        &config.header,
+                        &hf_ctx,
+                        ctx.margin_left,
+                        ctx.margin_top,
+                        ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+                    )?;
                 }
             }
         }
@@ -1047,6 +1422,26 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                 surface.set_stroke(None);
             }
         }
+
+        // Render footer on last page
+        let hf_ctx = HeaderFooterContext {
+            page_number: current_page_num,
+            total_pages,
+            current_filename: &current_filename,
+            date: &date_str,
+        };
+        header_footer::render_footer(
+            &mut surface,
+            hf_font.clone(),
+            &config.footer,
+            &hf_ctx,
+            ctx.margin_left,
+            ctx.page_height_mm,
+            ctx.margin_bottom,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
 
         // Finish page
         surface.finish();

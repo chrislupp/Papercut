@@ -7,17 +7,21 @@ cover_page:
   enabled: true
 
   title: "Paper Cut"
-  authors:
-    - "Christopher A. Lupp"
+
+  # Authors field supports multi-line text with paragraph breaks (double newlines)
+  authors: |
+    Christopher A. Lupp
 
   description: |
-    Paper Cut is a utility, written in Rust, that creates a pdf of source code
-    files. The main purpose is to aid public release purposes, but it can be
-    used for any process that requires a pdf copy of source code.
+    Paper Cut is a software utility, written in Rust, that creates a pdf of
+    source code files. The main purpose is to aid public release processes, but
+    it can be used for any process that requires a pdf copy of source code.
 
     This is the complete source code listing for the Paper Cut project. This
     document contains all source files, configuration examples, and
     documentation for public release purposes.
+
+    The code was developed completely outside the author's employment.
 
   location: "https://github.com/chrislupp/papercut"
 
@@ -27,10 +31,35 @@ cover_page:
   title_font_size: 24
   text_font_size: 12
 
+  # Optional: Override header/footer for cover page only
+  # If not set, uses the main header/footer config
+  header:
+    enabled: false  # No header on cover page
+  footer:
+    enabled: true
+    text: |
+      Distribution A: This work has been cleared for public release,
+      distribution unlimited, case number: AFRL-2025-XXXX. The views expressed
+      are those of the authors and do not reflect the official guidance or
+      position of the United States Government, the Department of Defense or of
+      the United States Air Force.
+
+      Statement from DoD: The Appearance of external hyperlinks does not
+      constitute endorsement by the United States Department of Defense (DoD) of
+      the linked websites, of the information, products, or services contained
+      therein. The DoD does not exercise any editorial, security, or other
+      control over the information you may find at these locations.
+    font_size: 8
+    # Optional: Override margins for this header/footer
+    margins:
+      left: "0.5 in"
+      right: "0.5 in"
+      bottom: "2 in"
+
 output:
   mode: single
   directory: ./pa_output
-  filename: papercut_pa.pdf
+  filename: papercut_source.pdf
 
 # ===== FILES TO CONVERT =====
 files:
@@ -90,15 +119,16 @@ page:
 
 header:
   enabled: true
-  left: "APPROVED FOR PUBLIC RELEASE"
   center: "{filename}"
   right: "Page {page}/{total}"
   font_size: 8
 
 footer:
   enabled: true
-  left: "Distribution A: "
-  center: "{filename}"
+  # Use 'text' for full-width wrapping (takes precedence over left/center/right)
+  # Double newlines create paragraph breaks
+  center: |
+    Distribution A: Distribution Unlimited
   font_size: 8
 
 metadata:

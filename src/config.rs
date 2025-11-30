@@ -287,6 +287,11 @@ impl Default for MarginsConfig {
 pub struct HeaderFooterConfig {
     #[serde(default = "default_false")]
     pub enabled: bool,
+    /// Full-width text (supports variables: {page}, {total}, {filename}, {date})
+    /// When set, this takes precedence over left/center/right and wraps across the full width
+    /// Respects paragraph breaks (double newlines) and is left-justified
+    #[serde(default)]
+    pub text: String,
     /// Text to display on the left (supports variables: {page}, {total}, {filename}, {date})
     #[serde(default)]
     pub left: String,
@@ -299,16 +304,37 @@ pub struct HeaderFooterConfig {
     /// Font size for header/footer
     #[serde(default = "default_header_footer_font_size")]
     pub font_size: u8,
+    /// Optional margin overrides for this header/footer
+    #[serde(default)]
+    pub margins: Option<HeaderFooterMargins>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HeaderFooterMargins {
+    /// Top margin for header positioning (in mm or with unit suffix like "1 in")
+    #[serde(default)]
+    pub top: Option<MarginValue>,
+    /// Bottom margin for footer positioning (in mm or with unit suffix like "1 in")
+    #[serde(default)]
+    pub bottom: Option<MarginValue>,
+    /// Left margin for header/footer (in mm or with unit suffix like "1 in")
+    #[serde(default)]
+    pub left: Option<MarginValue>,
+    /// Right margin for header/footer (in mm or with unit suffix like "1 in")
+    #[serde(default)]
+    pub right: Option<MarginValue>,
 }
 
 impl Default for HeaderFooterConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            text: String::new(),
             left: String::new(),
             center: String::new(),
             right: String::new(),
             font_size: default_header_footer_font_size(),
+            margins: None,
         }
     }
 }
@@ -400,9 +426,9 @@ pub struct CoverPageConfig {
     /// Title to display on the cover page
     #[serde(default)]
     pub title: String,
-    /// Authors to display on the cover page (supports single string or list)
-    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
-    pub authors: Vec<String>,
+    /// Authors text for the cover page (supports multiple lines with double newlines)
+    #[serde(default)]
+    pub authors: String,
     /// Description text for the cover page
     #[serde(default)]
     pub description: String,
@@ -424,6 +450,12 @@ pub struct CoverPageConfig {
     /// Font family for the cover page (default: Arial)
     #[serde(default = "default_cover_font_family")]
     pub font_family: String,
+    /// Optional header config for cover page (overrides main header if set)
+    #[serde(default)]
+    pub header: Option<HeaderFooterConfig>,
+    /// Optional footer config for cover page (overrides main footer if set)
+    #[serde(default)]
+    pub footer: Option<HeaderFooterConfig>,
 }
 
 impl Default for CoverPageConfig {
@@ -431,7 +463,7 @@ impl Default for CoverPageConfig {
         Self {
             enabled: false,
             title: String::new(),
-            authors: Vec::new(),
+            authors: String::new(),
             description: String::new(),
             location: String::new(),
             date: String::new(),
@@ -439,65 +471,10 @@ impl Default for CoverPageConfig {
             title_font_size: default_cover_title_font_size(),
             text_font_size: default_cover_text_font_size(),
             font_family: default_cover_font_family(),
+            header: None,
+            footer: None,
         }
     }
-}
-
-/// Deserialize a field that can be either a single string or a list of strings
-fn deserialize_string_or_vec<'de, D>(deserializer: D) -> std::result::Result<Vec<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de::{self, SeqAccess, Visitor};
-    use std::fmt;
-
-    struct StringOrVec;
-
-    impl<'de> Visitor<'de> for StringOrVec {
-        type Value = Vec<String>;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a string or a list of strings")
-        }
-
-        fn visit_str<E>(self, value: &str) -> std::result::Result<Vec<String>, E>
-        where
-            E: de::Error,
-        {
-            if value.is_empty() {
-                Ok(Vec::new())
-            } else {
-                Ok(vec![value.to_string()])
-            }
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Vec<String>, A::Error>
-        where
-            A: SeqAccess<'de>,
-        {
-            let mut vec = Vec::new();
-            while let Some(item) = seq.next_element()? {
-                vec.push(item);
-            }
-            Ok(vec)
-        }
-
-        fn visit_none<E>(self) -> std::result::Result<Vec<String>, E>
-        where
-            E: de::Error,
-        {
-            Ok(Vec::new())
-        }
-
-        fn visit_unit<E>(self) -> std::result::Result<Vec<String>, E>
-        where
-            E: de::Error,
-        {
-            Ok(Vec::new())
-        }
-    }
-
-    deserializer.deserialize_any(StringOrVec)
 }
 
 // Default value functions
@@ -734,7 +711,7 @@ impl Config {
                 self.metadata.title.clone()
             },
             author: if self.metadata.author.is_empty() {
-                self.cover_page.authors.join(", ")
+                self.cover_page.authors.clone()
             } else {
                 self.metadata.author.clone()
             },

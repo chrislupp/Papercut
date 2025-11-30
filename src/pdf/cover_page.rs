@@ -27,6 +27,8 @@ pub fn render_cover_page(
     let bold_font = font_manager.get_cover_bold_font(font_family)?;
 
     let mut current_y = margin_top + 80.0; // Start with some top padding
+    let text_font_size = config.cover_page.text_font_size as f32;
+    let line_height = text_font_size * 1.5;
 
     // Render title (large, centered, bold)
     if !config.cover_page.title.is_empty() {
@@ -45,35 +47,71 @@ pub fn render_cover_page(
         current_y += title_font_size + 20.0;
     }
 
-    // Render authors (centered, below title, one per line)
+    // Render date on same line as heading (form style)
+    {
+        let date_text = if config.cover_page.date.is_empty() {
+            Local::now().format("%Y-%m-%d").to_string()
+        } else {
+            config.cover_page.date.clone()
+        };
+
+        // Draw "Date <value>" on same line
+        let label = "Date ";
+        let label_width = estimate_text_width(label, text_font_size);
+
+        surface.draw_text(
+            Point::from_xy(margin_left, current_y),
+            bold_font.as_ref().clone(),
+            text_font_size,
+            label,
+            false,
+            TextDirection::Auto,
+        );
+
+        surface.draw_text(
+            Point::from_xy(margin_left + label_width, current_y),
+            font.as_ref().clone(),
+            text_font_size,
+            &date_text,
+            false,
+            TextDirection::Auto,
+        );
+
+        current_y += line_height + 20.0; // Spacing after date
+    }
+
+    // Render authors with bold heading
     if !config.cover_page.authors.is_empty() {
-        let text_font_size = config.cover_page.text_font_size as f32;
-        let line_height = text_font_size * 1.4;
+        // Draw "Author(s)" heading in bold
+        surface.draw_text(
+            Point::from_xy(margin_left, current_y),
+            bold_font.as_ref().clone(),
+            text_font_size,
+            "Author(s)",
+            false,
+            TextDirection::Auto,
+        );
+        current_y += line_height + 5.0;
 
-        for author in &config.cover_page.authors {
-            let author_width = estimate_text_width(author, text_font_size);
-            let author_x = margin_left + (content_width - author_width) / 2.0;
-
+        // Draw authors text (supports paragraph breaks with double newlines)
+        let lines = wrap_text(&config.cover_page.authors, content_width, text_font_size);
+        for line in lines {
             surface.draw_text(
-                Point::from_xy(author_x.max(margin_left), current_y),
+                Point::from_xy(margin_left, current_y),
                 font.as_ref().clone(),
                 text_font_size,
-                author,
+                &line,
                 false,
                 TextDirection::Auto,
             );
             current_y += line_height;
         }
-        current_y += 20.0; // Extra spacing after authors
-    } else {
-        current_y += 20.0; // Extra spacing if no authors
+
+        current_y += 30.0; // Extra spacing after authors
     }
 
     // Render description with bold heading
     if !config.cover_page.description.is_empty() {
-        let text_font_size = config.cover_page.text_font_size as f32;
-        let line_height = text_font_size * 1.5;
-
         // Draw "Description" heading in bold
         surface.draw_text(
             Point::from_xy(margin_left, current_y),
@@ -102,14 +140,21 @@ pub fn render_cover_page(
         current_y += 30.0; // Extra spacing after description
     }
 
-    // Render location/URL
+    // Render location/URL with bold heading
     if !config.cover_page.location.is_empty() {
-        let text_font_size = config.cover_page.text_font_size as f32;
-        let location_text = format!("Location: {}", config.cover_page.location);
+        // Draw "Location" heading in bold
+        surface.draw_text(
+            Point::from_xy(margin_left, current_y),
+            bold_font.as_ref().clone(),
+            text_font_size,
+            "Location",
+            false,
+            TextDirection::Auto,
+        );
+        current_y += line_height + 5.0;
 
-        // Wrap location if it's too long
-        let lines = wrap_text(&location_text, content_width, text_font_size);
-        let line_height = text_font_size * 1.5;
+        // Draw location text
+        let lines = wrap_text(&config.cover_page.location, content_width, text_font_size);
         for line in lines {
             surface.draw_text(
                 Point::from_xy(margin_left, current_y),
@@ -121,25 +166,7 @@ pub fn render_cover_page(
             );
             current_y += line_height;
         }
-        current_y += 10.0;
     }
-
-    // Render date (auto-generate if empty)
-    let date_text = if config.cover_page.date.is_empty() {
-        Local::now().format("%Y-%m-%d").to_string()
-    } else {
-        config.cover_page.date.clone()
-    };
-
-    let text_font_size = config.cover_page.text_font_size as f32;
-    surface.draw_text(
-        Point::from_xy(margin_left, current_y),
-        font.as_ref().clone(),
-        text_font_size,
-        &format!("Date: {}", date_text),
-        false,
-        TextDirection::Auto,
-    );
 
     Ok(())
 }

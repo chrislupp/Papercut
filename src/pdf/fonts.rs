@@ -102,6 +102,11 @@ impl FontManager {
         self.get_monospace_font()
     }
 
+    /// Get or load a font for headers/footers (reuses cover font)
+    pub fn get_header_footer_font(&mut self) -> Result<Arc<Font>> {
+        self.get_cover_font("Arial")
+    }
+
     /// Get or load a bold cover page font
     pub fn get_cover_bold_font(&mut self, font_family: &str) -> Result<Arc<Font>> {
         if let Some(font) = &self.cover_bold_font {
