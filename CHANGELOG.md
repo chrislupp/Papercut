@@ -8,10 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial release
-- PDF generation from source code files
-- Configurable headers and footers
-- Cover page with table of contents
-- Syntax highlighting support
-- Directory scanning with glob patterns
-- macOS DMG installer
+- PDF generation from source code files with syntax highlighting
+- Configurable page headers and footers with variable substitution
+- Cover page with table of contents and clickable hyperlinks
+- Directory scanning with glob patterns and file filtering
+- Flexible margin configuration (mm, cm, inches)
+- macOS DMG installer with app icon
