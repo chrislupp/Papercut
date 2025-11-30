@@ -8,7 +8,7 @@ Convert source code files to PDF with configurable headers, footers, and formatt
 
 #### macOS (DMG Installer)
 
-1. Download the latest `Papercut-X.X.X.dmg` from the [releases page](https://github.com/yourusername/papercut/releases)
+1. Download the latest `Papercut-X.X.X.dmg` from the [releases page](https://github.com/chrislupp/papercut/releases)
 2. Open the DMG and drag `Papercut.app` to your Applications folder
 3. (Optional) Double-click `Install CLI Tool` to add `papercut` to your PATH
 4. Run from terminal:

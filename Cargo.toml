@@ -1,6 +1,6 @@
 [package]
 name = "papercut"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "A CLI tool for converting source code files to PDF with configurable headers and footers"
