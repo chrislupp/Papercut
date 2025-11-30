@@ -17,6 +17,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>Papercut</string>
 
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+
 	<key>CFBundleVersion</key>
 	<string>{{VERSION}}</string>
 

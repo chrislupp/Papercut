@@ -1,5 +1,3 @@
-#!/usr/bin/osascript
-
 -- Install CLI Tool for Papercut
 -- This script creates a symlink from /usr/local/bin/papercut to the app bundle
 

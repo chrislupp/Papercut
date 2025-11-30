@@ -13,6 +13,7 @@ echo ""
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PACKAGING_DIR="$PROJECT_ROOT/packaging/macos"
 BUILD_DIR="$PACKAGING_DIR/build"
+ASSETS_DIR="$PROJECT_ROOT/assets/logos"
 
 # Clean previous build
 echo "🧹 Cleaning previous build artifacts..."
@@ -45,44 +46,56 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/papercut"
 echo "✓ Binary copied"
 echo ""
 
+# Generate app icon from SVG
+echo "🎨 Generating app icon..."
+SVG_FILE="$ASSETS_DIR/papercut_logo.svg"
+ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
+ICNS_FILE="$BUILD_DIR/AppIcon.icns"
+
+if [ ! -f "$SVG_FILE" ]; then
+    echo "⚠️  Warning: SVG logo not found at $SVG_FILE"
+    echo "   Skipping icon generation"
+else
+    # Check for rsvg-convert
+    if ! command -v rsvg-convert &> /dev/null; then
+        echo "⚠️  Warning: rsvg-convert not found"
+        echo "   Install with: brew install librsvg"
+        echo "   Skipping icon generation"
+    else
+        mkdir -p "$ICONSET_DIR"
+
+        # Generate PNG files at required sizes for macOS icons
+        for SIZE in 16 32 128 256 512; do
+            rsvg-convert -w "$SIZE" -h "$SIZE" "$SVG_FILE" -o "$ICONSET_DIR/icon_${SIZE}x${SIZE}.png"
+            DOUBLE=$((SIZE * 2))
+            rsvg-convert -w "$DOUBLE" -h "$DOUBLE" "$SVG_FILE" -o "$ICONSET_DIR/icon_${SIZE}x${SIZE}@2x.png"
+        done
+
+        # Create .icns file
+        iconutil -c icns "$ICONSET_DIR" -o "$ICNS_FILE"
+        rm -rf "$ICONSET_DIR"
+
+        # Copy icon to app bundle Resources
+        cp "$ICNS_FILE" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+        echo "✓ App icon generated and copied"
+    fi
+fi
+echo ""
+
 # Generate Info.plist from template
 echo "📝 Generating Info.plist..."
 sed "s/{{VERSION}}/$VERSION/g" "$PACKAGING_DIR/Info.plist.template" > "$APP_BUNDLE/Contents/Info.plist"
 echo "✓ Info.plist created"
 echo ""
 
-# Create CLI installer helper app
-echo "🛠️  Creating CLI installer helper..."
-INSTALLER_APP="$BUILD_DIR/Install CLI Tool.app"
-mkdir -p "$INSTALLER_APP/Contents/MacOS"
-
-# Compile AppleScript to app
-osacompile -o "$INSTALLER_APP" "$PACKAGING_DIR/scripts/install-cli-tool.applescript"
-echo "✓ CLI installer created"
-echo ""
-
-# Copy README for DMG
-if [ -f "$PACKAGING_DIR/dmg-readme.txt" ]; then
-    echo "📄 Copying DMG readme..."
-    cp "$PACKAGING_DIR/dmg-readme.txt" "$BUILD_DIR/README.txt"
-    echo "✓ README copied"
-    echo ""
-fi
 
 echo "========================================"
 echo "✅ Build completed successfully!"
 echo "========================================"
 echo ""
-echo "Output directory: $BUILD_DIR"
-echo ""
-echo "Contents:"
-echo "  • Papercut.app - Main application bundle"
-echo "  • Install CLI Tool.app - Optional CLI installer"
-if [ -f "$BUILD_DIR/README.txt" ]; then
-    echo "  • README.txt - Installation instructions"
-fi
+echo "Output: $APP_BUNDLE"
 echo ""
 echo "Next steps:"
 echo "  1. Run ./create-dmg.sh to create a DMG installer"
-echo "  2. Or test the app directly: open '$APP_BUNDLE'"
+echo "  2. Or test directly: open '$APP_BUNDLE'"
 echo ""

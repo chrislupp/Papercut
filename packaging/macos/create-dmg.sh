@@ -59,22 +59,34 @@ fi
 echo "📦 Creating DMG: $DMG_NAME"
 echo ""
 
-# Create DMG
-create-dmg \
-  --volname "Papercut Installer" \
-  --volicon "$BUILD_DIR/Papercut.app/Contents/Resources/AppIcon.icns" \
-  --window-pos 200 120 \
-  --window-size 660 450 \
-  --icon-size 100 \
-  --icon "Papercut.app" 180 180 \
-  --hide-extension "Papercut.app" \
-  --icon "Install CLI Tool.app" 480 180 \
-  --hide-extension "Install CLI Tool.app" \
-  --app-drop-link 180 320 \
-  --text-size 12 \
-  "$DIST_DIR/$DMG_NAME" \
-  "$BUILD_DIR/" \
-  2>/dev/null || true
+# Create a staging directory with only the app
+STAGING_DIR="$BUILD_DIR/dmg-staging"
+rm -rf "$STAGING_DIR"
+mkdir -p "$STAGING_DIR"
+cp -R "$BUILD_DIR/Papercut.app" "$STAGING_DIR/"
+
+# Build create-dmg arguments
+DMG_ARGS=(
+  --volname "Papercut"
+  --window-pos 200 120
+  --window-size 500 350
+  --icon-size 100
+  --icon "Papercut.app" 125 150
+  --hide-extension "Papercut.app"
+  --app-drop-link 375 150
+  --text-size 12
+)
+
+# Add volume icon if it exists
+if [ -f "$BUILD_DIR/Papercut.app/Contents/Resources/AppIcon.icns" ]; then
+  DMG_ARGS+=(--volicon "$BUILD_DIR/Papercut.app/Contents/Resources/AppIcon.icns")
+fi
+
+# Create DMG from staging directory
+create-dmg "${DMG_ARGS[@]}" "$DIST_DIR/$DMG_NAME" "$STAGING_DIR/" 2>/dev/null || true
+
+# Clean up staging
+rm -rf "$STAGING_DIR"
 
 # Note: create-dmg returns non-zero even on success sometimes, so we ignore errors
 # and check if the DMG was created instead
