@@ -7,10 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: 'Version bump type'
+        description: 'Version bump type (use "promote" to release current prerelease as stable)'
         required: true
         type: choice
         options:
+          - promote
           - major
           - minor
           - patch
@@ -108,17 +109,25 @@ jobs:
           fi
 
           # Check version bump type (exactly one required)
+          PROMOTE=$(echo "$LABELS" | jq 'map(select(. == "promote")) | length')
           MAJOR=$(echo "$LABELS" | jq 'map(select(. == "major")) | length')
           MINOR=$(echo "$LABELS" | jq 'map(select(. == "minor")) | length')
           PATCH=$(echo "$LABELS" | jq 'map(select(. == "patch")) | length')
 
-          BUMP_COUNT=$((MAJOR + MINOR + PATCH))
+          BUMP_COUNT=$((PROMOTE + MAJOR + MINOR + PATCH))
           if [ "$BUMP_COUNT" -ne 1 ]; then
-            echo "::error::Exactly one of 'major', 'minor', or 'patch' label is required"
+            echo "::error::Exactly one of 'promote', 'major', 'minor', or 'patch' label is required"
             exit 1
           fi
 
-          if [ "$MAJOR" -eq 1 ]; then
+          if [ "$PROMOTE" -eq 1 ]; then
+            # Promote cannot be used with prerelease label
+            if [ "$IS_PRERELEASE" -gt 0 ]; then
+              echo "::error::Cannot use 'promote' with 'prerelease' label. Promote is for releasing a prerelease as stable."
+              exit 1
+            fi
+            echo "bump=promote" >> $GITHUB_OUTPUT
+          elif [ "$MAJOR" -eq 1 ]; then
             echo "bump=major" >> $GITHUB_OUTPUT
           elif [ "$MINOR" -eq 1 ]; then
             echo "bump=minor" >> $GITHUB_OUTPUT
@@ -159,9 +168,20 @@ jobs:
           MINOR=$(echo "$CURRENT" | cut -d. -f2)
           PATCH=$(echo "$CURRENT" | cut -d. -f3 | cut -d- -f1)
 
+          # Check if current version is a prerelease
+          IS_PRERELEASE_VERSION=$(echo "$CURRENT" | grep -c '-' || true)
+
           # Apply bump
           BUMP="${{ steps.labels.outputs.bump }}"
           case "$BUMP" in
+            promote)
+              # Promote prerelease to stable - no version bump, just strip prerelease suffix
+              if [ "$IS_PRERELEASE_VERSION" -eq 0 ]; then
+                echo "::error::Cannot use 'promote' on a non-prerelease version. Use major/minor/patch instead."
+                exit 1
+              fi
+              # Version numbers stay the same, prerelease suffix will not be added
+              ;;
             major)
               MAJOR=$((MAJOR + 1))
               MINOR=0
@@ -272,11 +292,76 @@ jobs:
       - name: Install dependencies
         run: brew install librsvg create-dmg
 
+      - name: Import Apple certificate
+        if: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # Allow codesign to access keychain
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # Clean up certificate file
+          rm $RUNNER_TEMP/certificate.p12
+
+          # Find and export signing identity
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          if [ -n "$IDENTITY" ]; then
+            echo "APPLE_SIGNING_IDENTITY=$IDENTITY" >> $GITHUB_ENV
+            echo "✓ Found signing identity: $IDENTITY"
+          else
+            echo "⚠️ No Developer ID Application certificate found"
+          fi
+
       - name: Build and package
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         run: |
           cd packaging/macos
           ./build-macos.sh
           ./create-dmg.sh
+
+      - name: Notarize DMG
+        if: ${{ env.APPLE_SIGNING_IDENTITY != '' && secrets.APPLE_ID != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG_FILE=$(ls dist/*.dmg | head -1)
+
+          echo "📤 Submitting for notarization..."
+          xcrun notarytool submit "$DMG_FILE" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --wait
+
+          echo "📎 Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_FILE"
+
+          echo "✓ Notarization complete"
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
 
       - name: Upload DMG to release
         uses: softprops/action-gh-release@v2
