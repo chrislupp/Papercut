@@ -293,11 +293,16 @@ jobs:
         run: brew install librsvg create-dmg
 
       - name: Import Apple certificate
-        if: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          # Skip if no certificate provided
+          if [ -z "$APPLE_CERTIFICATE_BASE64" ]; then
+            echo "⚠️ No Apple certificate configured, skipping code signing"
+            exit 0
+          fi
+
           # Create temporary keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
@@ -338,12 +343,17 @@ jobs:
           ./create-dmg.sh
 
       - name: Notarize DMG
-        if: ${{ env.APPLE_SIGNING_IDENTITY != '' && secrets.APPLE_ID != '' }}
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # Skip if no signing identity or Apple ID
+          if [ -z "$APPLE_SIGNING_IDENTITY" ] || [ -z "$APPLE_ID" ]; then
+            echo "⚠️ Skipping notarization (missing signing identity or Apple ID)"
+            exit 0
+          fi
+
           DMG_FILE=$(ls dist/*.dmg | head -1)
 
           echo "📤 Submitting for notarization..."
