@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  pull_request:
-    types: [closed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
@@ -31,11 +28,6 @@ permissions:
 jobs:
   release:
     name: Create Release
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.merged == true &&
-       (contains(github.event.pull_request.labels.*.name, 'release') ||
-        contains(github.event.pull_request.labels.*.name, 'prerelease')))
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.new_version }}
@@ -74,86 +66,15 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Extract and validate labels
+      - name: Parse release inputs
         id: labels
         run: |
-          # Handle workflow_dispatch inputs
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "bump=${{ inputs.bump }}" >> $GITHUB_OUTPUT
-            if [ -n "${{ inputs.prerelease }}" ]; then
-              echo "prerelease=true" >> $GITHUB_OUTPUT
-              echo "pretype=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
-            else
-              echo "prerelease=false" >> $GITHUB_OUTPUT
-            fi
-            exit 0
-          fi
-
-          # Handle PR labels
-          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
-          echo "Labels: $LABELS"
-
-          # Check release type
-          IS_RELEASE=$(echo "$LABELS" | jq 'map(select(. == "release")) | length')
-          IS_PRERELEASE=$(echo "$LABELS" | jq 'map(select(. == "prerelease")) | length')
-
-          if [ "$IS_RELEASE" -gt 0 ] && [ "$IS_PRERELEASE" -gt 0 ]; then
-            echo "::error::Cannot have both 'release' and 'prerelease' labels"
-            exit 1
-          fi
-
-          if [ "$IS_PRERELEASE" -gt 0 ]; then
+          echo "bump=${{ inputs.bump }}" >> $GITHUB_OUTPUT
+          if [ -n "${{ inputs.prerelease }}" ]; then
             echo "prerelease=true" >> $GITHUB_OUTPUT
+            echo "pretype=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
-
-          # Check version bump type (exactly one required)
-          PROMOTE=$(echo "$LABELS" | jq 'map(select(. == "promote")) | length')
-          MAJOR=$(echo "$LABELS" | jq 'map(select(. == "major")) | length')
-          MINOR=$(echo "$LABELS" | jq 'map(select(. == "minor")) | length')
-          PATCH=$(echo "$LABELS" | jq 'map(select(. == "patch")) | length')
-
-          BUMP_COUNT=$((PROMOTE + MAJOR + MINOR + PATCH))
-          if [ "$BUMP_COUNT" -ne 1 ]; then
-            echo "::error::Exactly one of 'promote', 'major', 'minor', or 'patch' label is required"
-            exit 1
-          fi
-
-          if [ "$PROMOTE" -eq 1 ]; then
-            # Promote cannot be used with prerelease label
-            if [ "$IS_PRERELEASE" -gt 0 ]; then
-              echo "::error::Cannot use 'promote' with 'prerelease' label. Promote is for releasing a prerelease as stable."
-              exit 1
-            fi
-            echo "bump=promote" >> $GITHUB_OUTPUT
-          elif [ "$MAJOR" -eq 1 ]; then
-            echo "bump=major" >> $GITHUB_OUTPUT
-          elif [ "$MINOR" -eq 1 ]; then
-            echo "bump=minor" >> $GITHUB_OUTPUT
-          else
-            echo "bump=patch" >> $GITHUB_OUTPUT
-          fi
-
-          # Check prerelease type (required if prerelease)
-          if [ "$IS_PRERELEASE" -gt 0 ]; then
-            ALPHA=$(echo "$LABELS" | jq 'map(select(. == "alpha")) | length')
-            BETA=$(echo "$LABELS" | jq 'map(select(. == "beta")) | length')
-            RC=$(echo "$LABELS" | jq 'map(select(. == "rc")) | length')
-
-            PRE_COUNT=$((ALPHA + BETA + RC))
-            if [ "$PRE_COUNT" -ne 1 ]; then
-              echo "::error::Prerelease requires exactly one of 'alpha', 'beta', or 'rc' label"
-              exit 1
-            fi
-
-            if [ "$ALPHA" -eq 1 ]; then
-              echo "pretype=alpha" >> $GITHUB_OUTPUT
-            elif [ "$BETA" -eq 1 ]; then
-              echo "pretype=beta" >> $GITHUB_OUTPUT
-            else
-              echo "pretype=rc" >> $GITHUB_OUTPUT
-            fi
           fi
 
       - name: Calculate new version
