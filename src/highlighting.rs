@@ -29,7 +29,7 @@
 use std::path::{Path, PathBuf};
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{ThemeSet, Style, Color, Theme};
-use syntect::parsing::SyntaxSet;
+use syntect::parsing::{SyntaxSet, SyntaxSetBuilder, SyntaxDefinition};
 use syntect::util::LinesWithEndings;
 use crate::pdf::themes::ThemePreset;
 use crate::warnings::{WarningManager, WarningCategory};
@@ -45,6 +45,113 @@ pub struct StyledSegment {
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
+}
+
+/// Build SyntaxSet with defaults + embedded CMake + config syntaxes + convention dirs
+fn build_syntax_set(
+    config_syntaxes: &[PathBuf],
+    warning_manager: &WarningManager
+) -> SyntaxSet {
+    let mut builder = SyntaxSet::load_defaults_newlines().into_builder();
+
+    // 1. Add embedded CMake syntax
+    let cmake_syntax_yaml = include_str!("../assets/syntaxes/CMake.sublime-syntax");
+    match SyntaxDefinition::load_from_str(cmake_syntax_yaml, true, None) {
+        Ok(syntax) => builder.add(syntax),
+        Err(e) => warning_manager.warnf(
+            WarningCategory::Highlighting,
+            format!("Failed to load embedded CMake syntax: {}", e)
+        ),
+    }
+
+    // 2. Add syntaxes specified in config file (directories or files)
+    for path in config_syntaxes {
+        // Expand ~ to home directory
+        let expanded_path = expand_tilde(path);
+
+        if !expanded_path.exists() {
+            warning_manager.warnf(
+                WarningCategory::Highlighting,
+                format!("Custom syntax path not found: {}", path.display())
+            );
+            continue;
+        }
+
+        if expanded_path.is_dir() {
+            // Load all .sublime-syntax files from directory
+            if let Err(e) = builder.add_from_folder(&expanded_path, true) {
+                warning_manager.warnf(
+                    WarningCategory::Highlighting,
+                    format!("Failed to load syntaxes from '{}': {}", expanded_path.display(), e)
+                );
+            }
+        } else {
+            // Load individual file
+            load_syntax_file(&mut builder, &expanded_path, warning_manager);
+        }
+    }
+
+    // 3. Add syntaxes from convention directories (.papercut/syntaxes/)
+    for dir in get_convention_syntax_dirs() {
+        if let Err(e) = builder.add_from_folder(&dir, true) {
+            warning_manager.warnf(
+                WarningCategory::Highlighting,
+                format!("Failed to load syntaxes from '{}': {}", dir.display(), e)
+            );
+        }
+    }
+
+    builder.build()
+}
+
+/// Load a single syntax file
+fn load_syntax_file(builder: &mut SyntaxSetBuilder, path: &Path, warning_manager: &WarningManager) {
+    match fs::read_to_string(path) {
+        Ok(content) => {
+            match SyntaxDefinition::load_from_str(&content, true, None) {
+                Ok(syntax) => builder.add(syntax),
+                Err(e) => warning_manager.warnf(
+                    WarningCategory::Highlighting,
+                    format!("Failed to parse syntax '{}': {}", path.display(), e)
+                ),
+            }
+        }
+        Err(e) => warning_manager.warnf(
+            WarningCategory::Highlighting,
+            format!("Failed to read syntax file '{}': {}", path.display(), e)
+        ),
+    }
+}
+
+/// Expand ~ to home directory in path
+fn expand_tilde(path: &Path) -> PathBuf {
+    if let Some(path_str) = path.to_str() {
+        if path_str.starts_with("~/") {
+            if let Some(home) = dirs::home_dir() {
+                return home.join(&path_str[2..]);
+            }
+        }
+    }
+    path.to_path_buf()
+}
+
+/// Get convention syntax directories (project-level first, then user home)
+fn get_convention_syntax_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    let project_dir = PathBuf::from("./.papercut/syntaxes");
+    if project_dir.exists() && project_dir.is_dir() {
+        dirs.push(project_dir);
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        let home_dir = home.join(".papercut/syntaxes");
+        if home_dir.exists() && home_dir.is_dir() {
+            dirs.push(home_dir);
+        }
+    }
+
+    dirs
 }
 
 /// Try to load a custom theme from .papercut folders
@@ -106,9 +213,15 @@ fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Opti
 }
 
 /// Highlight code and return styled segments for PDF rendering
-pub fn highlight_code_styled(code: &str, file_path: &Path, theme_name: &str, warning_manager: &WarningManager) -> Result<Vec<Vec<StyledSegment>>, String> {
-    // Load syntax set
-    let ss = SyntaxSet::load_defaults_newlines();
+pub fn highlight_code_styled(
+    code: &str,
+    file_path: &Path,
+    theme_name: &str,
+    custom_syntaxes: &[PathBuf],
+    warning_manager: &WarningManager
+) -> Result<Vec<Vec<StyledSegment>>, String> {
+    // Load syntax set with custom syntaxes
+    let ss = build_syntax_set(custom_syntaxes, warning_manager);
 
     // Get the syntax definition based on file extension
     let syntax = ss
@@ -189,6 +302,35 @@ pub fn list_themes() {
     println!("You can also place custom .tmTheme files in .papercut/themes/");
 }
 
+/// List all available syntax definitions
+pub fn list_syntaxes(config_syntaxes: &[PathBuf]) {
+    let warning_manager = WarningManager::new(true);
+    let ss = build_syntax_set(config_syntaxes, &warning_manager);
+
+    println!("Available Syntax Definitions:");
+    println!();
+
+    let mut syntaxes: Vec<_> = ss.syntaxes().iter().collect();
+    syntaxes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    for syntax in syntaxes {
+        let exts: Vec<_> = syntax.file_extensions.iter()
+            .map(|s| s.as_str())
+            .collect();
+        let exts_str = exts.join(", ");
+        if exts_str.is_empty() {
+            println!("  - {}", syntax.name);
+        } else {
+            println!("  - {} ({})", syntax.name, exts_str);
+        }
+    }
+
+    println!();
+    println!("Custom syntaxes can be added via:");
+    println!("  - config: syntax_highlighting.custom_syntaxes");
+    println!("  - directories: .papercut/syntaxes/ or ~/.papercut/syntaxes/");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,7 +341,7 @@ mod tests {
         let code = "fn main() {\n    println!(\"Hello, world!\");\n}\n";
         let path = PathBuf::from("test.rs");
         let warning_manager = WarningManager::new(false);
-        let result = highlight_code_styled(code, &path, "base16-ocean.dark", &warning_manager);
+        let result = highlight_code_styled(code, &path, "base16-ocean.dark", &[], &warning_manager);
 
         assert!(result.is_ok());
         let lines = result.unwrap();
@@ -214,8 +356,61 @@ mod tests {
         let code = "fn main() {}";
         let path = PathBuf::from("test.rs");
         let warning_manager = WarningManager::new(false);
-        let result = highlight_code_styled(code, &path, "nonexistent-theme", &warning_manager);
+        let result = highlight_code_styled(code, &path, "nonexistent-theme", &[], &warning_manager);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cmake_syntax_available() {
+        let warning_manager = WarningManager::new(false);
+        let ss = build_syntax_set(&[], &warning_manager);
+
+        // Check that CMake syntax is available
+        let cmake_syntax = ss.find_syntax_by_name("CMake");
+        assert!(cmake_syntax.is_some(), "CMake syntax should be available");
+
+        // Check that it matches CMakeLists.txt files
+        let cmake_path = PathBuf::from("CMakeLists.txt");
+        let syntax = ss.find_syntax_for_file(&cmake_path).ok().flatten();
+        assert!(syntax.is_some(), "Should find syntax for CMakeLists.txt");
+        assert_eq!(syntax.unwrap().name, "CMake");
+    }
+
+    #[test]
+    fn test_highlight_cmake_code() {
+        let code = r#"cmake_minimum_required(VERSION 3.10)
+project(MyProject)
+
+set(CMAKE_CXX_STANDARD 17)
+
+add_executable(myapp main.cpp)
+"#;
+        let path = PathBuf::from("CMakeLists.txt");
+        let warning_manager = WarningManager::new(false);
+        let result = highlight_code_styled(code, &path, "base16-ocean.dark", &[], &warning_manager);
+
+        assert!(result.is_ok());
+        let lines = result.unwrap();
+        assert!(!lines.is_empty());
+        // Check that we got styled segments
+        let first_line_text: String = lines[0].iter().map(|s| s.text.as_str()).collect();
+        assert!(first_line_text.contains("cmake_minimum_required"));
+    }
+
+    #[test]
+    fn test_expand_tilde() {
+        // Test with a tilde path
+        let path = PathBuf::from("~/test/path");
+        let expanded = expand_tilde(&path);
+
+        if let Some(home) = dirs::home_dir() {
+            assert_eq!(expanded, home.join("test/path"));
+        }
+
+        // Test without tilde (should remain unchanged)
+        let path_no_tilde = PathBuf::from("/absolute/path");
+        let expanded_no_tilde = expand_tilde(&path_no_tilde);
+        assert_eq!(expanded_no_tilde, path_no_tilde);
     }
 }

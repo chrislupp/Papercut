@@ -223,6 +223,10 @@ pub struct SyntaxHighlightingConfig {
     /// Theme name (e.g., "base16-ocean.dark", "InspiredGitHub")
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Custom syntax sources - can be directories or individual .sublime-syntax files
+    /// Directories are scanned for all .sublime-syntax files
+    #[serde(default)]
+    pub custom_syntaxes: Vec<PathBuf>,
 }
 
 impl Default for SyntaxHighlightingConfig {
@@ -230,6 +234,7 @@ impl Default for SyntaxHighlightingConfig {
         Self {
             enabled: true,
             theme: default_theme(),
+            custom_syntaxes: Vec::new(),
         }
     }
 }
