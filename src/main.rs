@@ -72,6 +72,11 @@ struct Args {
     #[cfg(feature = "syntax-highlighting")]
     #[arg(long)]
     list_themes: bool,
+
+    /// List available syntax definitions (requires syntax-highlighting feature)
+    #[cfg(feature = "syntax-highlighting")]
+    #[arg(long)]
+    list_syntaxes: bool,
 }
 
 fn main() -> Result<()> {
@@ -80,6 +85,23 @@ fn main() -> Result<()> {
     #[cfg(feature = "syntax-highlighting")]
     if args.list_themes {
         highlighting::list_themes();
+        return Ok(());
+    }
+
+    #[cfg(feature = "syntax-highlighting")]
+    if args.list_syntaxes {
+        // Determine config file path for loading custom_syntaxes
+        let default_config = PathBuf::from(".papercut.yaml");
+        let config_path = args.config.as_ref().unwrap_or(&default_config);
+
+        let custom_syntaxes = if config_path.exists() {
+            Config::from_file(config_path)
+                .map(|c| c.syntax_highlighting.custom_syntaxes)
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        highlighting::list_syntaxes(&custom_syntaxes);
         return Ok(());
     }
 

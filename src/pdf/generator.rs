@@ -664,6 +664,7 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 &content,
                 &file_entry.path,
                 &config.syntax_highlighting.theme,
+                &config.syntax_highlighting.custom_syntaxes,
                 &warning_manager
             ) {
                 Ok(result) => Some(result),
