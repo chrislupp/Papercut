@@ -335,7 +335,7 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     // Pre-calculate document layout (page indices and total pages)
     let layout = calculate_document_layout(&config, &ctx)?;
 
-    let font = ctx.font_manager.get_monospace_font()?;
+    let font = ctx.font_manager.get_monospace_font(config.page.font_family.as_deref())?;
     let hf_font = ctx.font_manager.get_header_footer_font()?;
 
     // Initialize header/footer state
@@ -1187,7 +1187,7 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let effective_metadata = config.effective_metadata();
         ctx.set_metadata(&effective_metadata);
 
-        let font = ctx.font_manager.get_monospace_font()?;
+        let font = ctx.font_manager.get_monospace_font(config.page.font_family.as_deref())?;
         let hf_font = ctx.font_manager.get_header_footer_font()?;
 
         // For multiple mode, calculate pages for this single file

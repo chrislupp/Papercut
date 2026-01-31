@@ -59,7 +59,7 @@ impl PdfContext {
         let mut font_manager = FontManager::new(warning_manager);
 
         // Pre-load the monospace font
-        font_manager.get_monospace_font()?;
+        font_manager.get_monospace_font(config.page.font_family.as_deref())?;
 
         // Calculate page dimensions and margins (all in points)
         let (page_width_pt, page_height_pt) = get_page_size_points(&config.page.size);

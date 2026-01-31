@@ -80,6 +80,11 @@ page:
     left: "2.0cm"     # 2.0 cm (explicit)
     right: 2.0        # 2.0 cm
 
+  # Font family for source code (optional)
+  # If not specified, auto-detects from: Consolas, Monaco, Menlo, DejaVu Sans Mono, etc.
+  # Common options: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco"
+  # font_family: "JetBrains Mono"
+
   # Font size for code content (in points)
   # Typical values: 8-12
   font_size: 10
@@ -126,7 +131,7 @@ cover_page:
   # Main title displayed prominently on the cover page
   title: "Source Code Documentation"
 
-  # Author(s) displayed below the title (supports single string or list)
+  # Author(s) displayed below the title (supports string or list)
   # Single author: authors: "John Doe"
   # Multiple authors (shown one per line):
   authors:

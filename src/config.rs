@@ -32,6 +32,52 @@ use std::fmt;
 use std::path::PathBuf;
 use crate::error::{PapercutError, Result};
 
+/// Deserialize a field that can be either a string or a list of strings.
+/// If a list is provided, items are joined with double newlines.
+fn string_or_list<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOrList;
+
+    impl<'de> Visitor<'de> for StringOrList {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or a list of strings")
+        }
+
+        fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let mut items = Vec::new();
+            while let Some(item) = seq.next_element::<String>()? {
+                items.push(item);
+            }
+            // Join with double newlines to create paragraph breaks
+            Ok(items.join("\n\n"))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrList)
+}
+
+/// Wrapper for Option<String> that can deserialize from string or list
+fn option_string_or_list<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    string_or_list(deserializer)
+}
+
 /// A margin value that can be specified in cm or inches.
 /// Internally stored as points (1 inch = 72 points, 1 cm = 28.3465 points).
 #[derive(Debug, Clone, Copy)]
@@ -249,6 +295,9 @@ pub struct PageConfig {
     /// Margins in centimeters
     #[serde(default)]
     pub margins: MarginsConfig,
+    /// Font family for source code (optional, auto-detects if not specified)
+    #[serde(default)]
+    pub font_family: Option<String>,
     /// Font size for code content
     #[serde(default = "default_font_size")]
     pub font_size: u8,
@@ -277,6 +326,7 @@ impl Default for PageConfig {
         Self {
             size: default_page_size(),
             margins: MarginsConfig::default(),
+            font_family: None,
             font_size: default_font_size(),
             line_numbers: true,
             line_number_separator: true,
@@ -450,8 +500,8 @@ pub struct CoverPageConfig {
     /// Title to display on the cover page
     #[serde(default)]
     pub title: String,
-    /// Authors text for the cover page (supports multiple lines with double newlines)
-    #[serde(default)]
+    /// Authors text for the cover page (accepts a string or list of strings)
+    #[serde(default, deserialize_with = "option_string_or_list")]
     pub authors: String,
     /// Description text for the cover page
     #[serde(default)]
