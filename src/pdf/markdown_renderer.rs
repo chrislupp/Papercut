@@ -116,7 +116,7 @@ pub fn render_markdown(
     // Get fonts for krilla drawing
     let font = font_manager.get_cover_font("Arial")?;
     let bold_font = font_manager.get_cover_bold_font("Arial")?;
-    let mono_font = font_manager.get_monospace_font()?;
+    let mono_font = font_manager.get_monospace_font(None)?;
     let hf_font = font_manager.get_header_footer_font()?;
 
     // Initialize parley for text layout
