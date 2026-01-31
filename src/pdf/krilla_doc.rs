@@ -30,9 +30,10 @@ use crate::config::{Config, EffectiveMetadata, PageSize};
 use crate::error::{PapercutError, Result};
 use crate::pdf::fonts::FontManager;
 use crate::warnings::WarningManager;
-use krilla::Document;
+use krilla::geom::Size;
 use krilla::metadata::Metadata;
 use krilla::page::PageSettings;
+use krilla::Document;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -86,7 +87,9 @@ impl PdfContext {
 
     /// Get page settings for creating a new page
     pub fn page_settings(&self) -> PageSettings {
-        PageSettings::new(self.page_width_mm, self.page_height_mm)
+        let size = Size::from_wh(self.page_width_mm, self.page_height_mm)
+            .expect("Invalid page dimensions");
+        PageSettings::new(size)
     }
 
     /// Set PDF metadata from effective metadata (merged config + cover page)
