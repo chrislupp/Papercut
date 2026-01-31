@@ -173,6 +173,8 @@ pub struct Config {
     pub warnings: WarningsConfig,
     #[serde(default)]
     pub cover_page: CoverPageConfig,
+    #[serde(default)]
+    pub markdown_report: MarkdownReportConfig,
 }
 
 /// Expanded file entry after pattern matching
@@ -497,6 +499,16 @@ impl Default for CoverPageConfig {
             footer: None,
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct MarkdownReportConfig {
+    /// Enable or disable the markdown report
+    #[serde(default)]
+    pub enabled: bool,
+    /// Path to the markdown file (relative to config file or absolute)
+    #[serde(default)]
+    pub path: PathBuf,
 }
 
 // Default value functions

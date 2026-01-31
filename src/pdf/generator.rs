@@ -32,6 +32,7 @@ use crate::pdf::krilla_doc::PdfContext;
 use crate::pdf::colors::{rgb_to_paint, syntect_to_paint};
 use crate::pdf::cover_page;
 use crate::pdf::header_footer::{self, HeaderFooterContext};
+use crate::pdf::markdown_renderer::{render_markdown, MarkdownRenderContext};
 use crate::warnings::WarningManager;
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -498,6 +499,92 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         )?;
     } else {
         // No cover page - render header on first page
+        let hf_ctx = HeaderFooterContext {
+            page_number: current_page_num,
+            total_pages,
+            current_filename: &current_filename,
+            date: &date_str,
+        };
+        header_footer::render_header(
+            &mut surface,
+            hf_font.clone(),
+            &config.header,
+            &hf_ctx,
+            ctx.margin_left,
+            ctx.margin_top,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
+    }
+
+    // Render markdown report if enabled (after cover/TOC, before source code)
+    if config.markdown_report.enabled && !config.markdown_report.path.as_os_str().is_empty() {
+        // Finish current page before markdown rendering takes over
+        header_footer::render_footer(
+            &mut surface,
+            hf_font.clone(),
+            &config.footer,
+            &HeaderFooterContext {
+                page_number: current_page_num,
+                total_pages,
+                current_filename: &current_filename,
+                date: &date_str,
+            },
+            ctx.margin_left,
+            ctx.page_height_mm,
+            ctx.margin_bottom,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
+        surface.finish();
+        page.finish();
+
+        // Determine base directory for resolving relative image paths
+        let base_dir = config.markdown_report.path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+        if verbose {
+            println!("  Rendering markdown report: {}", config.markdown_report.path.display());
+        }
+
+        // Create markdown render context
+        let md_ctx = MarkdownRenderContext {
+            base_dir,
+            page_settings: ctx.page_settings(),
+            margin_left: ctx.margin_left,
+            margin_top: ctx.margin_top,
+            margin_right: ctx.margin_right,
+            margin_bottom: ctx.margin_bottom,
+            content_width: ctx.content_width,
+            content_height: ctx.content_height,
+            page_width: ctx.page_width_mm,
+            page_height: ctx.page_height_mm,
+            start_page_num: current_page_num + 1,
+            total_pages,
+            date_str: date_str.clone(),
+        };
+
+        // Render markdown
+        let (_pages_created, final_page) = render_markdown(
+            &mut ctx.document,
+            &mut ctx.font_manager,
+            &config,
+            &config.markdown_report.path,
+            md_ctx,
+        )?;
+        current_page_num = final_page;
+
+        // Start new page for source code
+        page = ctx.document.start_page_with(ctx.page_settings());
+        surface = page.surface();
+        current_y = ctx.margin_top;
+        current_page_num += 1;
+
+        // Render header on first source code page
         let hf_ctx = HeaderFooterContext {
             page_number: current_page_num,
             total_pages,

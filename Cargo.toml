@@ -17,7 +17,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 
 # PDF generation
-krilla = "0.5"
+krilla = { version = "0.6", features = ["raster-images"] }
+krilla-svg = "0.3"
+
+# SVG parsing
+usvg = "0.45"
+
+# Markdown parsing
+pulldown-cmark = "0.12"
 parley = "0.6"
 fontdb = "0.23"
 
