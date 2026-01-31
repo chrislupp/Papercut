@@ -66,22 +66,45 @@ Common values:
 
 ## Typography
 
-### Font Families
+### Custom Font Family
 
-Papercut supports three monospace font families for code:
+You can specify a preferred monospace font for source code rendering:
+
+```yaml
+page:
+  font_family: "JetBrains Mono"  # Optional - auto-detects if not specified
+```
+
+If not specified, Papercut auto-detects from available system fonts in this order:
+Consolas, Monaco, Menlo, DejaVu Sans Mono, Liberation Mono, Courier New, Courier.
+
+**Popular programming fonts:**
+
+| Font              | Style           | Notes                          |
+|-------------------|-----------------|--------------------------------|
+| JetBrains Mono    | Modern          | Designed for code, ligatures   |
+| Fira Code         | Modern          | Popular, ligature support      |
+| Source Code Pro   | Clean           | Adobe's coding font            |
+| Consolas          | Classic         | Windows default, very readable |
+| Monaco            | Classic         | macOS classic                  |
+| DejaVu Sans Mono  | Professional    | Good Unicode support           |
+
+If the specified font is not found, a warning is displayed and the system falls back to available fonts.
+
+### Legacy Styling Font Family
+
+The `styling.font_family` option provides preset choices (deprecated in favor of `page.font_family`):
 
 ```yaml
 styling:
   font_family: monospace  # or courier, dejavu
 ```
 
-Font characteristics:
-
-| Font      | Style       | Best For                    |
-|-----------|-------------|------------------------------|
-| monospace | Clean, modern | General purpose, modern look |
-| courier   | Classic     | Traditional code listings    |
-| dejavu    | Professional | Professional documentation   |
+| Preset    | Description                          |
+|-----------|--------------------------------------|
+| monospace | Generic monospace (system default)   |
+| courier   | Courier New                          |
+| dejavu    | DejaVu Sans Mono                     |
 
 ### Font Sizes
 
@@ -119,6 +142,44 @@ Line numbers appear on the left side of code with the format:
    1 | fn main() {
    2 |     println!("Hello, world!");
    3 | }
+```
+
+### Line Number Separator
+
+Show or hide the vertical line between line numbers and code:
+
+```yaml
+page:
+  line_number_separator: true  # or false
+```
+
+### Vertical Borders
+
+Show or hide vertical borders at the left and right edges of the code area:
+
+```yaml
+page:
+  vertical_borders: true  # or false
+```
+
+### Line Wrapping
+
+Control how long lines are handled:
+
+```yaml
+page:
+  wrap_long_lines: true   # Enable line wrapping (default)
+  wrap_indent: 4          # Indentation for wrapped lines
+```
+
+- **wrap_long_lines**: When `true`, lines exceeding page width wrap to the next line. When `false`, lines are truncated.
+- **wrap_indent**: Number of spaces to indent continuation lines (helps distinguish them from new source lines)
+
+Example with wrapping enabled and `wrap_indent: 4`:
+```
+   1 | let very_long_variable_name = some_function_call(argument1,
+       argument2, argument3);
+   2 | let short = 42;
 ```
 
 ## Colors
@@ -187,7 +248,7 @@ styling:
 ```yaml
 syntax_highlighting:
   enabled: true
-  theme: base16-ocean.dark
+  theme: vscode-light
 ```
 
 ### Available Themes
@@ -198,12 +259,30 @@ To see all available themes:
 papercut --list-themes
 ```
 
+### Built-in Presets
+
+Papercut includes optimized presets for popular editors:
+
+| Preset             | Style | Description                        |
+|--------------------|-------|------------------------------------|
+| `vscode-light`     | Light | VS Code light theme (default)      |
+| `vscode-dark`      | Dark  | VS Code dark theme                 |
+| `jetbrains-light`  | Light | IntelliJ/JetBrains light theme     |
+| `jetbrains-darcula`| Dark  | IntelliJ Darcula theme             |
+
+```yaml
+syntax_highlighting:
+  enabled: true
+  theme: vscode-dark
+```
+
 ### Popular Themes
 
 #### Light Themes
 
 Good for printing and professional documents:
 
+- **vscode-light**: VS Code default light (recommended)
 - **InspiredGitHub**: Clean, GitHub-style highlighting
 - **Solarized (light)**: Carefully designed color palette
 - **base16-ocean.light**: Soft, ocean-inspired colors
@@ -211,13 +290,15 @@ Good for printing and professional documents:
 ```yaml
 syntax_highlighting:
   enabled: true
-  theme: InspiredGitHub
+  theme: vscode-light
 ```
 
 #### Dark Themes
 
 Good for screen reading and presentations:
 
+- **vscode-dark**: VS Code dark theme
+- **jetbrains-darcula**: IntelliJ Darcula (popular)
 - **base16-ocean.dark**: Popular dark theme with blue tones
 - **Solarized (dark)**: Professional dark theme
 - **Monokai**: High contrast, vibrant colors
@@ -225,7 +306,7 @@ Good for screen reading and presentations:
 ```yaml
 syntax_highlighting:
   enabled: true
-  theme: base16-ocean.dark
+  theme: jetbrains-darcula
 ```
 
 ### Choosing a Theme

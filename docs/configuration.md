@@ -14,7 +14,9 @@ The configuration file is organized into the following sections:
 - `footer` - Footer configuration
 - `styling` - Visual styling options
 - `metadata` - PDF metadata
+- `warnings` - Warning configuration
 - `cover_page` - Cover page configuration
+- `markdown_report` - Markdown report configuration
 
 ## Output Configuration
 
@@ -140,17 +142,26 @@ Controls syntax highlighting for source code.
 ```yaml
 syntax_highlighting:
   enabled: true
-  theme: base16-ocean.dark
+  theme: vscode-light
+  custom_syntaxes:
+    - /path/to/syntaxes/  # Directory of .sublime-syntax files
+    - /path/to/Custom.sublime-syntax  # Individual syntax file
 ```
 
 ### Fields
 
-- **enabled** (optional, default: `false`): Enable syntax highlighting
+- **enabled** (optional, default: `true`): Enable syntax highlighting
   - Requires the `syntax-highlighting` feature to be enabled
 
-- **theme** (optional, default: `base16-ocean.dark`): Theme name
+- **theme** (optional, default: `vscode-light`): Theme name
   - Run `papercut --list-themes` to see available themes
-  - Popular themes: `InspiredGitHub`, `Solarized (dark)`, `Solarized (light)`
+  - **Built-in presets**: `vscode-light`, `vscode-dark`, `jetbrains-light`, `jetbrains-darcula`
+  - **Popular themes**: `InspiredGitHub`, `Solarized (dark)`, `Solarized (light)`, `base16-ocean.dark`
+
+- **custom_syntaxes** (optional): List of custom syntax definition paths
+  - Can be directories (scanned for all `.sublime-syntax` files) or individual files
+  - Useful for languages not included in the default set (e.g., CMake)
+  - Syntax files use the Sublime Text `.sublime-syntax` format
 
 ## Page Configuration
 
@@ -164,9 +175,14 @@ page:
     bottom: "1in"     # 1 inch (string with unit)
     left: "2.0cm"     # 2.0 cm (explicit unit)
     right: 2.0
+  font_family: "JetBrains Mono"  # Optional custom font
   font_size: 10
   line_numbers: true
+  line_number_separator: true
+  vertical_borders: true
   line_spacing: 1.2
+  wrap_long_lines: true
+  wrap_indent: 4
 ```
 
 ### Fields
@@ -187,15 +203,32 @@ page:
   - String with `cm` suffix: Centimeters (e.g., `"2.5cm"`)
   - String with `in` suffix: Inches (e.g., `"1in"`, `"0.75in"`)
 
+- **font_family** (optional): Preferred monospace font for source code
+  - If not specified, auto-detects from: Consolas, Monaco, Menlo, DejaVu Sans Mono, etc.
+  - Common options: `"JetBrains Mono"`, `"Fira Code"`, `"Source Code Pro"`, `"Consolas"`, `"Monaco"`
+  - If the specified font is not found, a warning is emitted and falls back to system defaults
+
 - **font_size** (optional, default: `10`): Font size for code content in points
   - Typical values: 8-12
 
 - **line_numbers** (optional, default: `true`): Show line numbers
 
+- **line_number_separator** (optional, default: `true`): Show vertical line between line numbers and code
+
+- **vertical_borders** (optional, default: `true`): Show vertical borders at left and right edges of content
+
 - **line_spacing** (optional, default: `1.2`): Line spacing multiplier
   - 1.0 = single spacing
   - 1.5 = 1.5× spacing
   - 2.0 = double spacing
+
+- **wrap_long_lines** (optional, default: `true`): Enable line wrapping for long lines
+  - When enabled, lines exceeding the page width wrap to the next line
+  - When disabled, long lines are truncated
+
+- **wrap_indent** (optional, default: `4`): Indentation for wrapped continuation lines
+  - Number of spaces to indent wrapped lines
+  - Helps visually distinguish continuation lines from new source lines
 
 ## Header/Footer Configuration
 
@@ -290,6 +323,30 @@ metadata:
 
 - **keywords** (optional): List of keywords for searchability
 
+## Warnings Configuration
+
+Controls warning output during PDF generation.
+
+```yaml
+warnings:
+  enabled: true
+  silence_categories:
+    - fonts        # Silence font-related warnings
+    - themes       # Silence theme-related warnings
+```
+
+### Fields
+
+- **enabled** (optional, default: `true`): Enable or disable all warnings
+  - When `false`, all warnings are suppressed
+  - Can also be overridden with `--quiet` CLI flag
+
+- **silence_categories** (optional): List of warning categories to silence
+  - `fonts`: Font file read failures and fallback behavior
+  - `themes`: Custom theme loading and parsing errors
+  - `highlighting`: Syntax highlighting failures (falls back to plain text)
+  - `filesystem`: Directory walking errors, permission denied, non-UTF-8 paths
+
 ## Cover Page Configuration
 
 Controls the optional cover page that appears before the printed code.
@@ -310,6 +367,12 @@ cover_page:
   title_font_size: 24
   text_font_size: 12
   font_family: "Arial"                  # Cover page font
+  # Optional: Override header/footer for cover page only
+  header:
+    enabled: false
+  footer:
+    enabled: true
+    center: "Cover Page Footer"
 ```
 
 ### Fields
@@ -358,6 +421,14 @@ cover_page:
   - Common options: "Arial", "Helvetica", "Times New Roman", "Georgia"
   - Falls back to Arial if the specified font is not available
   - The title and "Description" heading are rendered in bold
+
+- **header** (optional): Override header configuration for cover page only
+  - If not specified, uses the main `header` configuration
+  - Accepts the same fields as the main header configuration
+
+- **footer** (optional): Override footer configuration for cover page only
+  - If not specified, uses the main `footer` configuration
+  - Accepts the same fields as the main footer configuration
 
 ### Examples
 
@@ -412,6 +483,61 @@ cover_page:
   text_font_size: 14
   description: "Complete technical documentation"
   location: "https://internal.company.com/alpha"
+```
+
+## Markdown Report Configuration
+
+Include a markdown document before the source code listing. Useful for adding documentation, analysis, or reports.
+
+```yaml
+markdown_report:
+  enabled: true
+  path: docs/report.md
+```
+
+### Fields
+
+- **enabled** (optional, default: `false`): Enable the markdown report
+  - When `true`, the markdown file is rendered before source code content
+
+- **path** (required when enabled): Path to the markdown file
+  - Can be relative to the config file or absolute
+  - Supports standard markdown formatting
+  - Images are embedded (supports PNG, JPEG, SVG)
+  - Code blocks are syntax highlighted
+
+### Supported Markdown Features
+
+- **Headings**: `#`, `##`, `###`, etc.
+- **Text formatting**: Bold, italic, strikethrough
+- **Lists**: Ordered and unordered
+- **Code blocks**: Fenced code blocks with syntax highlighting
+- **Images**: Local images are embedded in the PDF
+- **Links**: Displayed as text (PDFs don't support clickable links in body)
+- **Block quotes**: Indented quote blocks
+- **Horizontal rules**: Page separators
+
+### Example
+
+```yaml
+markdown_report:
+  enabled: true
+  path: analysis/code_review.md
+```
+
+Where `code_review.md` might contain:
+
+```markdown
+# Code Review Summary
+
+## Overview
+This document provides an analysis of the authentication module.
+
+## Key Findings
+- Input validation is comprehensive
+- Session handling follows best practices
+
+![Architecture Diagram](diagrams/auth_flow.svg)
 ```
 
 ## Minimal Configuration Example
