@@ -5,6 +5,7 @@ This document provides real-world configuration examples for common use cases.
 ## Table of Contents
 
 - [Code Review Documentation](#code-review-documentation)
+- [Technical Report with Markdown](#technical-report-with-markdown)
 - [Public Release Package](#public-release-package)
 - [Internal Audit Trail](#internal-audit-trail)
 - [API Documentation](#api-documentation)
@@ -70,6 +71,103 @@ metadata:
 **Usage:**
 ```bash
 papercut -c config.yaml -v
+```
+
+---
+
+## Technical Report with Markdown
+
+Include a technical analysis or documentation before source code listing.
+
+**Use Case**: Code audits with findings, architecture documentation, technical reports
+
+**report_config.yaml:**
+```yaml
+output:
+  mode: single
+  directory: ./reports
+  filename: security_analysis_2024.pdf
+
+# Include markdown report before source code
+markdown_report:
+  enabled: true
+  path: docs/security_analysis.md
+
+files:
+  - path: src/auth/
+    include_types: ["rs"]
+    title: "Authentication Module"
+  - path: src/crypto/
+    include_types: ["rs"]
+    title: "Cryptography Module"
+
+syntax_highlighting:
+  enabled: true
+  theme: vscode-light
+
+page:
+  size: Letter
+  font_family: "JetBrains Mono"
+  font_size: 9
+  line_numbers: true
+  wrap_long_lines: true
+  wrap_indent: 4
+
+cover_page:
+  enabled: true
+  title: "Security Code Analysis"
+  authors:
+    - "Security Team"
+    - "Architecture Team"
+  description: |
+    Comprehensive security analysis of authentication and
+    cryptography modules with code review findings.
+  include_toc: true
+
+header:
+  enabled: true
+  left: "CONFIDENTIAL"
+  right: "Page {page}/{total}"
+
+footer:
+  enabled: true
+  left: "{date}"
+  center: "{filename}"
+  right: "Security Review"
+
+metadata:
+  title: "Security Code Analysis 2024"
+  author: "Security Team"
+  keywords: ["security", "audit", "code review"]
+```
+
+**docs/security_analysis.md:**
+```markdown
+# Security Analysis Report
+
+## Executive Summary
+
+This report documents the security review of the authentication
+and cryptography modules.
+
+## Findings
+
+### High Priority
+
+1. **Input Validation** - All user inputs are properly sanitized
+2. **Session Management** - Tokens expire appropriately
+
+### Recommendations
+
+- Consider adding rate limiting to login endpoints
+- Implement additional logging for failed auth attempts
+
+![Security Architecture](diagrams/auth_flow.svg)
+```
+
+**Usage:**
+```bash
+papercut -c report_config.yaml -v
 ```
 
 ---

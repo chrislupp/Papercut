@@ -8,8 +8,8 @@ This guide covers how to use Papercut from the command line.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/papercut.git
-cd papercut
+git clone https://github.com/chrislupp/Papercut.git
+cd Papercut
 
 # Build and install
 cargo install --path .
@@ -82,6 +82,32 @@ Rendering PDF to: ./output/combined.pdf
 PDF generation completed successfully!
 ```
 
+### `--force` / `-f`
+
+Force overwrite existing files without prompting.
+
+```bash
+papercut --config config.yaml --force
+papercut -c config.yaml -f
+```
+
+**Required**: No
+
+Use this flag in non-interactive environments (CI/CD pipelines, scripts) where prompts cannot be answered.
+
+### `--quiet` / `-q`
+
+Suppress all warning messages.
+
+```bash
+papercut --config config.yaml --quiet
+papercut -c config.yaml -q
+```
+
+**Required**: No
+
+Overrides the `warnings.enabled` setting in the configuration file. Useful for clean output in automated pipelines.
+
 ### `--list-themes`
 
 List all available syntax highlighting themes (requires `syntax-highlighting` feature).
@@ -95,11 +121,19 @@ Example output:
 ```
 Available syntax highlighting themes:
 
+Built-in presets:
+  - vscode-light (default)
+  - vscode-dark
+  - jetbrains-light
+  - jetbrains-darcula
+
+Additional themes:
   - InspiredGitHub
   - Solarized (dark)
   - Solarized (light)
   - base16-ocean.dark
   - base16-ocean.light
+  ...
 
 Use these theme names in your configuration file.
 ```
