@@ -2,10 +2,10 @@
 name = "papercut"
 version = "1.0.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Christopher Lupp <christopherlupp@gmail.com>"]
 description = "A CLI tool for converting source code files to PDF with configurable headers and footers"
 license = "GPL-3.0"
-repository = "https://github.com/yourusername/papercut"
+repository = "https://github.com/chrislupp/Papercut"
 readme = "README.md"
 
 [dependencies]
@@ -14,7 +14,7 @@ clap = { version = "4.5", features = ["derive"] }
 
 # Configuration parsing
 serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+serde-saphyr = "1.0.0-rc.1"
 
 # PDF generation
 krilla = { version = "0.6", features = ["raster-images"] }
@@ -48,6 +48,9 @@ is-terminal = "0.4"
 [features]
 default = ["syntax-highlighting"]
 syntax-highlighting = ["syntect"]
+
+[dev-dependencies]
+tempfile = "3.20"
 
 [[bin]]
 name = "papercut"

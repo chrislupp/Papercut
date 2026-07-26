@@ -105,7 +105,8 @@ impl WarningManager {
         let _ = writeln!(
             std::io::stderr(),
             "\x1b[33mWarning\x1b[0m [\x1b[36m{}\x1b[0m]: {}",
-            category_str, message
+            category_str,
+            message
         );
     }
 
@@ -127,11 +128,26 @@ mod tests {
 
     #[test]
     fn test_category_from_str() {
-        assert_eq!(WarningCategory::from_str("fonts"), Some(WarningCategory::Fonts));
-        assert_eq!(WarningCategory::from_str("Fonts"), Some(WarningCategory::Fonts));
-        assert_eq!(WarningCategory::from_str("themes"), Some(WarningCategory::Themes));
-        assert_eq!(WarningCategory::from_str("highlighting"), Some(WarningCategory::Highlighting));
-        assert_eq!(WarningCategory::from_str("filesystem"), Some(WarningCategory::Filesystem));
+        assert_eq!(
+            WarningCategory::from_str("fonts"),
+            Some(WarningCategory::Fonts)
+        );
+        assert_eq!(
+            WarningCategory::from_str("Fonts"),
+            Some(WarningCategory::Fonts)
+        );
+        assert_eq!(
+            WarningCategory::from_str("themes"),
+            Some(WarningCategory::Themes)
+        );
+        assert_eq!(
+            WarningCategory::from_str("highlighting"),
+            Some(WarningCategory::Highlighting)
+        );
+        assert_eq!(
+            WarningCategory::from_str("filesystem"),
+            Some(WarningCategory::Filesystem)
+        );
         assert_eq!(WarningCategory::from_str("invalid"), None);
     }
 

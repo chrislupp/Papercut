@@ -46,7 +46,7 @@ pub enum PapercutError {
     Io(#[from] std::io::Error),
 
     #[error("YAML parsing error: {0}\n  Tip: Validate your YAML syntax - check for proper indentation and valid field names.")]
-    YamlParse(#[from] serde_yaml::Error),
+    YamlParse(#[from] serde_saphyr::Error),
 
     #[error("PDF generation error: {0}\n  Tip: Check that the output directory is writable and you have sufficient disk space.")]
     PdfGeneration(String),

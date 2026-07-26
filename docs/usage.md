@@ -31,6 +31,9 @@ cargo build --release --no-default-features
 
 The simplest way to use Papercut is to provide a configuration file:
 
+Relative paths in the configuration are resolved from the configuration file's directory, not
+from the shell's current working directory.
+
 ```bash
 papercut --config config.yaml
 ```

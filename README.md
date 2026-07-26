@@ -2,6 +2,9 @@
 
 Convert source code files to PDF with configurable headers, footers, and formatting.
 
+Relative paths are resolved from the configuration file's directory, so a configuration behaves
+consistently regardless of the shell's current working directory.
+
 ## Quick Start
 
 ### Installation

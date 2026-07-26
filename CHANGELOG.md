@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Strict validation for unknown configuration fields and unusable wrapping layouts
+- Deterministic numbering for colliding filenames in multiple-output mode
+- CLI regression tests for config-relative paths and overwrite protection
+
+### Changed
+- Resolve relative paths from the configuration file's directory
+- Preserve custom titles and deduplicate files selected by overlapping entries
+- Replace deprecated `serde_yaml` with `serde-saphyr`
+- Check overwrite decisions before rendering PDFs
+
+### Fixed
+- Build failures when syntax highlighting is disabled
+- Potential unsigned underflow while wrapping highlighted source lines
+- Suppressed filesystem warnings during input scanning
+
 ## [1.0.0] - 2026-01-29
 
 ### Added
