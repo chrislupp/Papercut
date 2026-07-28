@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
 // control over the information you may find at these locations.
 
 use crate::error::{PapercutError, Result};
-use crate::warnings::{WarningManager, WarningCategory};
+use crate::warnings::{WarningCategory, WarningManager};
 use fontdb::{Database, Query, Source};
 use krilla::text::Font;
 use std::sync::Arc;
@@ -59,9 +59,27 @@ impl FontManager {
     }
 
     /// Get or load a monospace font suitable for code display
-    pub fn get_monospace_font(&mut self) -> Result<Arc<Font>> {
+    /// If `preferred` is provided, tries that font first before falling back to defaults
+    pub fn get_monospace_font(&mut self, preferred: Option<&str>) -> Result<Arc<Font>> {
         if let Some(font) = &self.monospace_font {
             return Ok(Arc::clone(font));
+        }
+
+        // Try the preferred font first if specified
+        if let Some(preferred_family) = preferred {
+            if let Some(font) = self.try_load_font(preferred_family) {
+                let font_arc = Arc::new(font);
+                self.monospace_font = Some(Arc::clone(&font_arc));
+                return Ok(font_arc);
+            }
+            // Preferred font not found, warn and fall back
+            self.warning_manager.warnf(
+                WarningCategory::Fonts,
+                format!(
+                    "Preferred font '{}' not found, falling back to system defaults",
+                    preferred_family
+                ),
+            );
         }
 
         // Try to find a good monospace font in order of preference
@@ -86,7 +104,8 @@ impl FontManager {
 
         Err(PapercutError::InvalidConfig(
             "Could not find any suitable monospace font. Please install a monospace font like \
-             Consolas, Monaco, or DejaVu Sans Mono.".to_string()
+             Consolas, Monaco, or DejaVu Sans Mono."
+                .to_string(),
         ))
     }
 
@@ -127,7 +146,7 @@ impl FontManager {
         }
 
         // Fall back to monospace if no serif font available
-        self.get_monospace_font()
+        self.get_monospace_font(None)
     }
 
     /// Get or load a font for headers/footers (reuses cover font)
@@ -215,7 +234,7 @@ impl FontManager {
                     Err(e) => {
                         self.warning_manager.warnf(
                             WarningCategory::Fonts,
-                            format!("Failed to read font file '{}': {}", path.display(), e)
+                            format!("Failed to read font file '{}': {}", path.display(), e),
                         );
                         None
                     }
@@ -228,7 +247,11 @@ impl FontManager {
                     Err(e) => {
                         self.warning_manager.warnf(
                             WarningCategory::Fonts,
-                            format!("Failed to read shared font file '{}': {}", path.display(), e)
+                            format!(
+                                "Failed to read shared font file '{}': {}",
+                                path.display(),
+                                e
+                            ),
                         );
                         None
                     }
@@ -285,7 +308,7 @@ mod tests {
     #[test]
     fn test_find_monospace_font() {
         let mut manager = FontManager::new(Arc::new(WarningManager::new(false)));
-        let result = manager.get_monospace_font();
+        let result = manager.get_monospace_font(None);
         assert!(result.is_ok(), "Should find at least one monospace font");
     }
 }

@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -26,11 +26,58 @@
 // therein. The DoD does not exercise any editorial, security, or other
 // control over the information you may find at these locations.
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de::{self, Visitor};
-use std::fmt;
-use std::path::PathBuf;
 use crate::error::{PapercutError, Result};
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashSet;
+use std::fmt;
+use std::path::{Path, PathBuf};
+
+/// Deserialize a field that can be either a string or a list of strings.
+/// If a list is provided, items are joined with double newlines.
+fn string_or_list<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct StringOrList;
+
+    impl<'de> Visitor<'de> for StringOrList {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string or a list of strings")
+        }
+
+        fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let mut items = Vec::new();
+            while let Some(item) = seq.next_element::<String>()? {
+                items.push(item);
+            }
+            // Join with double newlines to create paragraph breaks
+            Ok(items.join("\n\n"))
+        }
+    }
+
+    deserializer.deserialize_any(StringOrList)
+}
+
+/// Wrapper for Option<String> that can deserialize from string or list
+fn option_string_or_list<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    string_or_list(deserializer)
+}
 
 /// A margin value that can be specified in cm or inches.
 /// Internally stored as points (1 inch = 72 points, 1 cm = 28.3465 points).
@@ -42,12 +89,16 @@ pub struct MarginValue {
 impl MarginValue {
     /// Create a margin value from centimeters
     pub fn from_cm(cm: f32) -> Self {
-        Self { points: cm * 28.3465 }
+        Self {
+            points: cm * 28.3465,
+        }
     }
 
     /// Create a margin value from inches
     pub fn from_inches(inches: f32) -> Self {
-        Self { points: inches * 72.0 }
+        Self {
+            points: inches * 72.0,
+        }
     }
 
     /// Get the value in points
@@ -151,6 +202,7 @@ impl Serialize for MarginValue {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub output: OutputConfig,
     pub files: Vec<FileEntry>,
@@ -173,15 +225,27 @@ pub struct Config {
     pub warnings: WarningsConfig,
     #[serde(default)]
     pub cover_page: CoverPageConfig,
+    #[serde(default)]
+    pub markdown_report: MarkdownReportConfig,
 }
 
 /// Expanded file entry after pattern matching
 #[derive(Debug, Clone)]
 pub struct ExpandedFileEntry {
     pub path: PathBuf,
+    pub title: Option<String>,
+}
+
+impl ExpandedFileEntry {
+    pub fn display_name(&self) -> String {
+        self.title
+            .clone()
+            .unwrap_or_else(|| self.path.display().to_string())
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct OutputConfig {
     /// "single" for one combined PDF, "multiple" for one PDF per file
     pub mode: OutputMode,
@@ -201,6 +265,7 @@ pub enum OutputMode {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct FileEntry {
     pub path: PathBuf,
     /// Optional custom title for this file in the PDF
@@ -217,12 +282,17 @@ pub struct FileEntry {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct SyntaxHighlightingConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
     /// Theme name (e.g., "base16-ocean.dark", "InspiredGitHub")
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Custom syntax sources - can be directories or individual .sublime-syntax files
+    /// Directories are scanned for all .sublime-syntax files
+    #[serde(default)]
+    pub custom_syntaxes: Vec<PathBuf>,
 }
 
 impl Default for SyntaxHighlightingConfig {
@@ -230,11 +300,13 @@ impl Default for SyntaxHighlightingConfig {
         Self {
             enabled: true,
             theme: default_theme(),
+            custom_syntaxes: Vec::new(),
         }
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct PageConfig {
     /// Page size: "A4", "Letter", "Legal"
     #[serde(default = "default_page_size")]
@@ -242,6 +314,9 @@ pub struct PageConfig {
     /// Margins in centimeters
     #[serde(default)]
     pub margins: MarginsConfig,
+    /// Font family for source code (optional, auto-detects if not specified)
+    #[serde(default)]
+    pub font_family: Option<String>,
     /// Font size for code content
     #[serde(default = "default_font_size")]
     pub font_size: u8,
@@ -270,6 +345,7 @@ impl Default for PageConfig {
         Self {
             size: default_page_size(),
             margins: MarginsConfig::default(),
+            font_family: None,
             font_size: default_font_size(),
             line_numbers: true,
             line_number_separator: true,
@@ -289,6 +365,7 @@ pub enum PageSize {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct MarginsConfig {
     #[serde(default = "default_margin_top")]
     pub top: MarginValue,
@@ -312,6 +389,7 @@ impl Default for MarginsConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct HeaderFooterConfig {
     #[serde(default = "default_false")]
     pub enabled: bool,
@@ -338,6 +416,7 @@ pub struct HeaderFooterConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct HeaderFooterMargins {
     /// Top margin for header positioning (in mm or with unit suffix like "1 in")
     #[serde(default)]
@@ -368,6 +447,7 @@ impl Default for HeaderFooterConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct StylingConfig {
     /// Font family for code: "monospace", "courier", "dejavu"
     #[serde(default = "default_font_family")]
@@ -405,6 +485,7 @@ pub enum FontFamily {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default)]
+#[serde(deny_unknown_fields)]
 pub struct MetadataConfig {
     #[serde(default)]
     pub title: String,
@@ -417,6 +498,7 @@ pub struct MetadataConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct WarningsConfig {
     /// Enable or disable all warnings
     #[serde(default = "default_true")]
@@ -436,6 +518,7 @@ impl Default for WarningsConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct CoverPageConfig {
     /// Enable or disable the cover page
     #[serde(default = "default_false")]
@@ -443,8 +526,8 @@ pub struct CoverPageConfig {
     /// Title to display on the cover page
     #[serde(default)]
     pub title: String,
-    /// Authors text for the cover page (supports multiple lines with double newlines)
-    #[serde(default)]
+    /// Authors text for the cover page (accepts a string or list of strings)
+    #[serde(default, deserialize_with = "option_string_or_list")]
     pub authors: String,
     /// Description text for the cover page
     #[serde(default)]
@@ -492,6 +575,17 @@ impl Default for CoverPageConfig {
             footer: None,
         }
     }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+#[serde(deny_unknown_fields)]
+pub struct MarkdownReportConfig {
+    /// Enable or disable the markdown report
+    #[serde(default)]
+    pub enabled: bool,
+    /// Path to the markdown file (relative to config file or absolute)
+    #[serde(default)]
+    pub path: PathBuf,
 }
 
 // Default value functions
@@ -580,31 +674,67 @@ fn default_cover_font_family() -> String {
 }
 
 impl Config {
-    /// Load configuration from a YAML file
-    pub fn from_file(path: &PathBuf) -> Result<Self> {
+    /// Load configuration while allowing the CLI to suppress scan-time warnings.
+    pub fn from_file_with_warnings(path: &Path, warnings_allowed: bool) -> Result<Self> {
         let contents = std::fs::read_to_string(path)
             .map_err(|e| PapercutError::Config(format!("Failed to read config file: {}", e)))?;
 
-        let mut config: Config = serde_yaml::from_str(&contents)?;
+        let mut config: Config = serde_saphyr::from_str(&contents)?;
+        let base_dir = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        let base_dir = std::fs::canonicalize(base_dir).map_err(|e| {
+            PapercutError::Config(format!(
+                "Failed to resolve config directory '{}': {}",
+                base_dir.display(),
+                e
+            ))
+        })?;
 
-        // Expand file patterns before validation
-        config.expand_file_patterns()?;
+        config.resolve_relative_paths(&base_dir);
+        config.expand_file_patterns(warnings_allowed)?;
         config.validate()?;
 
         Ok(config)
     }
 
+    fn resolve_relative_paths(&mut self, base_dir: &Path) {
+        fn resolve(base_dir: &Path, path: &mut PathBuf) {
+            if !path.as_os_str().is_empty() && path.is_relative() {
+                *path = base_dir.join(&*path);
+            }
+        }
+
+        resolve(base_dir, &mut self.output.directory);
+        resolve(base_dir, &mut self.markdown_report.path);
+        for syntax_path in &mut self.syntax_highlighting.custom_syntaxes {
+            resolve(base_dir, syntax_path);
+        }
+        for file in &mut self.files {
+            resolve(base_dir, &mut file.path);
+        }
+    }
+
     /// Expand file patterns and populate expanded_files
-    fn expand_file_patterns(&mut self) -> Result<()> {
+    fn expand_file_patterns(&mut self, warnings_allowed: bool) -> Result<()> {
         use crate::file_scanner;
         use crate::warnings::WarningManager;
         use std::sync::Arc;
 
-        // Create a disabled warning manager for config loading
-        // (warnings config hasn't been parsed yet)
-        let warning_manager = Arc::new(WarningManager::new(false));
+        let warning_manager = Arc::new(WarningManager::new(
+            warnings_allowed && self.warnings.enabled,
+        ));
+        let silenced: Vec<_> = self
+            .warnings
+            .silence_categories
+            .iter()
+            .filter_map(|category| crate::warnings::WarningCategory::from_str(category))
+            .collect();
+        warning_manager.silence_categories(&silenced);
 
         let mut expanded_files = Vec::new();
+        let mut seen = HashSet::new();
 
         for file_entry in &self.files {
             let files = file_scanner::expand_file_patterns(
@@ -616,8 +746,14 @@ impl Config {
 
             // Add each expanded file
             for file_path in files {
+                let identity =
+                    std::fs::canonicalize(&file_path).unwrap_or_else(|_| file_path.clone());
+                if !seen.insert(identity) {
+                    continue;
+                }
                 expanded_files.push(ExpandedFileEntry {
                     path: file_path,
+                    title: file_entry.title.clone(),
                 });
             }
         }
@@ -631,14 +767,14 @@ impl Config {
         // Validate that we have at least one file specification
         if self.files.is_empty() {
             return Err(PapercutError::InvalidConfig(
-                "No files specified in configuration".to_string()
+                "No files specified in configuration".to_string(),
             ));
         }
 
         // Validate that pattern expansion resulted in at least one file
         if self.expanded_files.is_empty() {
             return Err(PapercutError::InvalidConfig(
-                "No files matched the specified patterns".to_string()
+                "No files matched the specified patterns".to_string(),
             ));
         }
 
@@ -646,13 +782,14 @@ impl Config {
         for file_entry in &self.expanded_files {
             if !file_entry.path.exists() {
                 return Err(PapercutError::FileNotFound(
-                    file_entry.path.display().to_string()
+                    file_entry.path.display().to_string(),
                 ));
             }
             if !file_entry.path.is_file() {
-                return Err(PapercutError::InvalidConfig(
-                    format!("{} is not a regular file", file_entry.path.display())
-                ));
+                return Err(PapercutError::InvalidConfig(format!(
+                    "{} is not a regular file",
+                    file_entry.path.display()
+                )));
             }
         }
 
@@ -662,25 +799,34 @@ impl Config {
         let margin_left_pt = self.page.margins.left.as_points();
         let margin_right_pt = self.page.margins.right.as_points();
 
-        if margin_top_pt < 0.0 || margin_bottom_pt < 0.0 ||
-           margin_left_pt < 0.0 || margin_right_pt < 0.0 {
+        if margin_top_pt < 0.0
+            || margin_bottom_pt < 0.0
+            || margin_left_pt < 0.0
+            || margin_right_pt < 0.0
+        {
             return Err(PapercutError::InvalidConfig(
-                "Margins must be non-negative".to_string()
+                "Margins must be non-negative".to_string(),
             ));
         }
 
         // Validate font sizes
         if self.page.font_size == 0 {
             return Err(PapercutError::InvalidConfig(
-                "Font size must be greater than 0".to_string()
+                "Font size must be greater than 0".to_string(),
+            ));
+        }
+
+        if !self.page.line_spacing.is_finite() || self.page.line_spacing <= 0.0 {
+            return Err(PapercutError::InvalidConfig(
+                "Line spacing must be a finite number greater than 0".to_string(),
             ));
         }
 
         // Get page size in points
         let (page_width_pt, page_height_pt) = match self.page.size {
-            PageSize::A4 => (595.28, 841.89),      // 210mm x 297mm
-            PageSize::Letter => (612.0, 792.0),     // 8.5" x 11"
-            PageSize::Legal => (612.0, 1008.0),     // 8.5" x 14"
+            PageSize::A4 => (595.28, 841.89),   // 210mm x 297mm
+            PageSize::Letter => (612.0, 792.0), // 8.5" x 11"
+            PageSize::Legal => (612.0, 1008.0), // 8.5" x 14"
         };
 
         // Calculate content area
@@ -703,6 +849,34 @@ impl Config {
                     self.page.margins.top.as_cm(), self.page.margins.bottom.as_cm()
                 )
             ));
+        }
+
+        let font_size = self.page.font_size as f32;
+        let line_number_width = if self.page.line_numbers {
+            font_size * 3.5
+        } else {
+            0.0
+        };
+        let max_chars = ((content_width - line_number_width) / (font_size * 0.6)).floor();
+        if !max_chars.is_finite() || max_chars < 1.0 {
+            return Err(PapercutError::InvalidConfig(
+                "Page margins and font settings leave no usable width for source code".to_string(),
+            ));
+        }
+        if self.page.wrap_long_lines && self.page.wrap_indent >= max_chars as usize {
+            return Err(PapercutError::InvalidConfig(format!(
+                "wrap_indent ({}) must be smaller than the available line width ({} characters)",
+                self.page.wrap_indent, max_chars as usize
+            )));
+        }
+
+        if self.output.mode == OutputMode::Single {
+            let filename = Path::new(&self.output.filename);
+            if filename.file_name() != Some(filename.as_os_str()) {
+                return Err(PapercutError::InvalidConfig(
+                    "output.filename must be a filename, not a path".to_string(),
+                ));
+            }
         }
 
         // Warn if content area is very small (less than 50% of page)
@@ -745,4 +919,100 @@ pub struct EffectiveMetadata {
     pub author: String,
     pub subject: String,
     pub keywords: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn write_config(directory: &Path, body: &str) -> PathBuf {
+        let path = directory.join("papercut.yaml");
+        fs::write(&path, body).expect("test config should be writable");
+        path
+    }
+
+    #[test]
+    fn resolves_paths_preserves_titles_and_deduplicates_files() {
+        let temp = tempfile::tempdir().expect("temporary directory should be created");
+        let temp_path = temp
+            .path()
+            .canonicalize()
+            .expect("temporary directory should be canonicalizable");
+        fs::create_dir(temp.path().join("src")).expect("source directory should be created");
+        fs::write(temp.path().join("src/main.rs"), "fn main() {}")
+            .expect("source file should be writable");
+        fs::write(temp.path().join("report.md"), "# Report").expect("report should be writable");
+
+        let config_path = write_config(
+            temp.path(),
+            r#"
+output:
+  mode: single
+  directory: output
+files:
+  - path: src/main.rs
+    title: Main entry point
+  - path: src/*.rs
+markdown_report:
+  enabled: true
+  path: report.md
+"#,
+        );
+
+        let config =
+            Config::from_file_with_warnings(&config_path, true).expect("config should load");
+        assert_eq!(config.expanded_files.len(), 1);
+        assert_eq!(
+            config.expanded_files[0].title.as_deref(),
+            Some("Main entry point")
+        );
+        assert_eq!(config.expanded_files[0].path, temp_path.join("src/main.rs"));
+        assert_eq!(config.output.directory, temp_path.join("output"));
+        assert_eq!(config.markdown_report.path, temp_path.join("report.md"));
+    }
+
+    #[test]
+    fn rejects_unknown_fields() {
+        let temp = tempfile::tempdir().expect("temporary directory should be created");
+        fs::write(temp.path().join("main.rs"), "fn main() {}")
+            .expect("source file should be writable");
+        let config_path = write_config(
+            temp.path(),
+            r#"
+output:
+  mode: single
+  directry: output
+files:
+  - path: main.rs
+"#,
+        );
+
+        let error = Config::from_file_with_warnings(&config_path, true)
+            .expect_err("unknown field should fail");
+        assert!(error.to_string().contains("directry"));
+    }
+
+    #[test]
+    fn rejects_wrap_indent_that_consumes_the_line() {
+        let temp = tempfile::tempdir().expect("temporary directory should be created");
+        fs::write(temp.path().join("main.rs"), "fn main() {}")
+            .expect("source file should be writable");
+        let config_path = write_config(
+            temp.path(),
+            r#"
+output:
+  mode: single
+files:
+  - path: main.rs
+page:
+  font_size: 10
+  wrap_indent: 1000
+"#,
+        );
+
+        let error = Config::from_file_with_warnings(&config_path, true)
+            .expect_err("invalid wrapping should fail");
+        assert!(error.to_string().contains("wrap_indent"));
+    }
 }

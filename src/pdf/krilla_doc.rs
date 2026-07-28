@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -30,9 +30,10 @@ use crate::config::{Config, EffectiveMetadata, PageSize};
 use crate::error::{PapercutError, Result};
 use crate::pdf::fonts::FontManager;
 use crate::warnings::WarningManager;
-use krilla::Document;
+use krilla::geom::Size;
 use krilla::metadata::Metadata;
 use krilla::page::PageSettings;
+use krilla::Document;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -58,7 +59,7 @@ impl PdfContext {
         let mut font_manager = FontManager::new(warning_manager);
 
         // Pre-load the monospace font
-        font_manager.get_monospace_font()?;
+        font_manager.get_monospace_font(config.page.font_family.as_deref())?;
 
         // Calculate page dimensions and margins (all in points)
         let (page_width_pt, page_height_pt) = get_page_size_points(&config.page.size);
@@ -86,7 +87,9 @@ impl PdfContext {
 
     /// Get page settings for creating a new page
     pub fn page_settings(&self) -> PageSettings {
-        PageSettings::new(self.page_width_mm, self.page_height_mm)
+        let size = Size::from_wh(self.page_width_mm, self.page_height_mm)
+            .expect("Invalid page dimensions");
+        PageSettings::new(size)
     }
 
     /// Set PDF metadata from effective metadata (merged config + cover page)
@@ -115,17 +118,18 @@ impl PdfContext {
     /// Finish the document and write to file
     pub fn save(self, path: &Path) -> Result<()> {
         // Finish and get PDF bytes
-        let pdf_bytes = self.document
-            .finish()
-            .map_err(|e| PapercutError::PdfGeneration(
-                format!("Failed to finish PDF document: {:?}", e)
-            ))?;
+        let pdf_bytes = self.document.finish().map_err(|e| {
+            PapercutError::PdfGeneration(format!("Failed to finish PDF document: {:?}", e))
+        })?;
 
         // Write to file
-        std::fs::write(path, pdf_bytes)
-            .map_err(|e| PapercutError::PdfGeneration(
-                format!("Failed to write PDF to '{}': {}", path.display(), e)
-            ))?;
+        std::fs::write(path, pdf_bytes).map_err(|e| {
+            PapercutError::PdfGeneration(format!(
+                "Failed to write PDF to '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
 
         Ok(())
     }
@@ -134,9 +138,8 @@ impl PdfContext {
 /// Get page size in points (PDF standard: 1 point = 1/72 inch)
 fn get_page_size_points(size: &PageSize) -> (f32, f32) {
     match size {
-        PageSize::A4 => (595.28, 841.89),      // 210mm x 297mm
-        PageSize::Letter => (612.0, 792.0),     // 8.5" x 11"
-        PageSize::Legal => (612.0, 1008.0),     // 8.5" x 14"
+        PageSize::A4 => (595.28, 841.89),   // 210mm x 297mm
+        PageSize::Letter => (612.0, 792.0), // 8.5" x 11"
+        PageSize::Legal => (612.0, 1008.0), // 8.5" x 14"
     }
 }
-

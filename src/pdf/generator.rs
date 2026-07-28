@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,10 +28,13 @@
 
 use crate::config::{Config, OutputMode};
 use crate::error::{PapercutError, Result};
-use crate::pdf::krilla_doc::PdfContext;
-use crate::pdf::colors::{rgb_to_paint, syntect_to_paint};
+use crate::pdf::colors::rgb_to_paint;
+#[cfg(feature = "syntax-highlighting")]
+use crate::pdf::colors::syntect_to_paint;
 use crate::pdf::cover_page;
 use crate::pdf::header_footer::{self, HeaderFooterContext};
+use crate::pdf::krilla_doc::PdfContext;
+use crate::pdf::markdown_renderer::{render_markdown, MarkdownRenderContext};
 use crate::warnings::WarningManager;
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -39,9 +42,10 @@ use krilla::geom::{PathBuilder, Point};
 use krilla::num::NormalizedF32;
 use krilla::paint::{Fill, Stroke};
 use krilla::text::TextDirection;
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[cfg(feature = "syntax-highlighting")]
@@ -66,10 +70,13 @@ fn wrap_styled_line(
 
         while !remaining_chars.is_empty() {
             let available = if is_first_line {
-                max_chars - current_line_chars
+                max_chars.saturating_sub(current_line_chars)
             } else {
-                max_chars - wrap_indent - current_line_chars
+                max_chars
+                    .saturating_sub(wrap_indent)
+                    .saturating_sub(current_line_chars)
             };
+            let available = available.max(1);
 
             if remaining_chars.len() <= available {
                 // Entire remaining segment fits on current line
@@ -146,19 +153,18 @@ fn should_overwrite_file(path: &Path, force: bool) -> Result<bool> {
 
     // Check if stdout is a TTY (interactive terminal)
     if !is_terminal::IsTerminal::is_terminal(&io::stdout()) {
-        return Err(PapercutError::InvalidConfig(
-            format!(
-                "File '{}' already exists. Use --force to overwrite files in non-interactive mode.",
-                path.display()
-            )
-        ));
+        return Err(PapercutError::InvalidConfig(format!(
+            "File '{}' already exists. Use --force to overwrite files in non-interactive mode.",
+            path.display()
+        )));
     }
 
     // Interactive mode: prompt user
-    print!("File '{}' already exists. Overwrite? [y/N]: ", path.display());
-    io::stdout()
-        .flush()
-        .map_err(PapercutError::Io)?;
+    print!(
+        "File '{}' already exists. Overwrite? [y/N]: ",
+        path.display()
+    );
+    io::stdout().flush().map_err(PapercutError::Io)?;
 
     let mut input = String::new();
     io::stdin()
@@ -166,6 +172,41 @@ fn should_overwrite_file(path: &Path, force: bool) -> Result<bool> {
         .map_err(PapercutError::Io)?;
 
     Ok(input.trim().eq_ignore_ascii_case("y"))
+}
+
+fn multiple_output_paths(config: &Config) -> Vec<PathBuf> {
+    let mut totals = HashMap::new();
+    for file in &config.expanded_files {
+        let stem = file
+            .path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("output")
+            .to_string();
+        *totals.entry(stem).or_insert(0usize) += 1;
+    }
+
+    let mut occurrences = HashMap::new();
+    config
+        .expanded_files
+        .iter()
+        .map(|file| {
+            let stem = file
+                .path
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("output")
+                .to_string();
+            let occurrence = occurrences.entry(stem.clone()).or_insert(0usize);
+            *occurrence += 1;
+            let filename = if totals[&stem] > 1 {
+                format!("{}-{}.pdf", stem, occurrence)
+            } else {
+                format!("{}.pdf", stem)
+            };
+            config.output.directory.join(filename)
+        })
+        .collect()
 }
 
 /// Count the number of wrapped lines for a file's content
@@ -247,7 +288,8 @@ fn calculate_document_layout(config: &Config, ctx: &PdfContext) -> Result<Docume
             // Subsequent pages have more room (no header)
             let list_font_size = config.cover_page.text_font_size as f32;
             let line_height = list_font_size * 1.6;
-            let entries_per_subsequent_page = ((ctx.content_height - 20.0) / line_height).floor() as usize;
+            let entries_per_subsequent_page =
+                ((ctx.content_height - 20.0) / line_height).floor() as usize;
 
             let total_files = config.expanded_files.len();
             if total_files <= entries_first_page {
@@ -310,7 +352,12 @@ fn calculate_document_layout(config: &Config, ctx: &PdfContext) -> Result<Docume
 }
 
 /// Main entry point for PDF generation
-pub fn generate(config: Config, verbose: bool, force: bool, warning_manager: Arc<WarningManager>) -> Result<()> {
+pub fn generate(
+    config: Config,
+    verbose: bool,
+    force: bool,
+    warning_manager: Arc<WarningManager>,
+) -> Result<()> {
     match config.output.mode {
         OutputMode::Single => generate_single_pdf(config, verbose, force, warning_manager),
         OutputMode::Multiple => generate_multiple_pdfs(config, verbose, force, warning_manager),
@@ -318,12 +365,24 @@ pub fn generate(config: Config, verbose: bool, force: bool, warning_manager: Arc
 }
 
 /// Generate a single PDF containing all files
-fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manager: Arc<WarningManager>) -> Result<()> {
+fn generate_single_pdf(
+    config: Config,
+    verbose: bool,
+    force: bool,
+    warning_manager: Arc<WarningManager>,
+) -> Result<()> {
     if verbose {
-        println!("Generating single PDF with {} files", config.expanded_files.len());
+        println!(
+            "Generating single PDF with {} files",
+            config.expanded_files.len()
+        );
     }
 
     let output_path = config.output.directory.join(&config.output.filename);
+    if !should_overwrite_file(&output_path, force)? {
+        println!("Skipping file.");
+        return Ok(());
+    }
 
     let mut ctx = PdfContext::new(config.clone(), Arc::clone(&warning_manager))?;
 
@@ -334,7 +393,9 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     // Pre-calculate document layout (page indices and total pages)
     let layout = calculate_document_layout(&config, &ctx)?;
 
-    let font = ctx.font_manager.get_monospace_font()?;
+    let font = ctx
+        .font_manager
+        .get_monospace_font(config.page.font_family.as_deref())?;
     let hf_font = ctx.font_manager.get_header_footer_font()?;
 
     // Initialize header/footer state
@@ -426,8 +487,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                     ctx.margin_left,
                     ctx.margin_top,
                     ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                    ctx.page_width_mm,
+                    ctx.margin_right,
                 )?;
 
                 let (files_rendered, toc_links) = cover_page::render_toc_page(
@@ -452,8 +513,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                     ctx.page_height_mm,
                     ctx.margin_bottom,
                     ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                    ctx.page_width_mm,
+                    ctx.margin_right,
                 )?;
 
                 // Finish surface before adding annotations to page
@@ -517,6 +578,97 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         )?;
     }
 
+    // Render markdown report if enabled (after cover/TOC, before source code)
+    if config.markdown_report.enabled && !config.markdown_report.path.as_os_str().is_empty() {
+        // Finish current page before markdown rendering takes over
+        header_footer::render_footer(
+            &mut surface,
+            hf_font.clone(),
+            &config.footer,
+            &HeaderFooterContext {
+                page_number: current_page_num,
+                total_pages,
+                current_filename: &current_filename,
+                date: &date_str,
+            },
+            ctx.margin_left,
+            ctx.page_height_mm,
+            ctx.margin_bottom,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
+        surface.finish();
+        page.finish();
+
+        // Determine base directory for resolving relative image paths
+        let base_dir = config
+            .markdown_report
+            .path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+        if verbose {
+            println!(
+                "  Rendering markdown report: {}",
+                config.markdown_report.path.display()
+            );
+        }
+
+        // Create markdown render context
+        let md_ctx = MarkdownRenderContext {
+            base_dir,
+            page_settings: ctx.page_settings(),
+            margin_left: ctx.margin_left,
+            margin_top: ctx.margin_top,
+            margin_right: ctx.margin_right,
+            margin_bottom: ctx.margin_bottom,
+            content_width: ctx.content_width,
+            content_height: ctx.content_height,
+            page_width: ctx.page_width_mm,
+            page_height: ctx.page_height_mm,
+            start_page_num: current_page_num + 1,
+            total_pages,
+            date_str: date_str.clone(),
+        };
+
+        // Render markdown
+        let (_pages_created, final_page) = render_markdown(
+            &mut ctx.document,
+            &mut ctx.font_manager,
+            &config,
+            &config.markdown_report.path,
+            md_ctx,
+        )?;
+        current_page_num = final_page;
+
+        // Start new page for source code
+        page = ctx.document.start_page_with(ctx.page_settings());
+        surface = page.surface();
+        current_y = ctx.margin_top;
+        current_page_num += 1;
+
+        // Render header on first source code page
+        let hf_ctx = HeaderFooterContext {
+            page_number: current_page_num,
+            total_pages,
+            current_filename: &current_filename,
+            date: &date_str,
+        };
+        header_footer::render_header(
+            &mut surface,
+            hf_font.clone(),
+            &config.header,
+            &hf_ctx,
+            ctx.margin_left,
+            ctx.margin_top,
+            ctx.content_width,
+            ctx.page_width_mm,
+            ctx.margin_right,
+        )?;
+    }
+
     // Create progress bar if processing multiple files and not in verbose mode
     let progress = if !verbose && config.expanded_files.len() > 1 {
         let pb = ProgressBar::new(config.expanded_files.len() as u64);
@@ -524,7 +676,7 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
             ProgressStyle::default_bar()
                 .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
                 .expect("Invalid progress bar template")
-                .progress_chars("=>-")
+                .progress_chars("=>-"),
         );
         Some(pb)
     } else {
@@ -534,13 +686,21 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
     // Process each file
     for (idx, file_entry) in config.expanded_files.iter().enumerate() {
         if verbose {
-            println!("  Processing file {}/{}: {}",
+            println!(
+                "  Processing file {}/{}: {}",
                 idx + 1,
                 config.expanded_files.len(),
                 file_entry.path.display()
             );
         } else if let Some(ref pb) = progress {
-            pb.set_message(format!("{}", file_entry.path.file_name().unwrap_or_default().to_string_lossy()));
+            pb.set_message(format!(
+                "{}",
+                file_entry
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+            ));
         }
 
         // Check file size before reading
@@ -560,15 +720,15 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         }
 
         // Read file content
-        let content = fs::read_to_string(&file_entry.path)
-            .map_err(|e| PapercutError::FileRead {
+        let content =
+            fs::read_to_string(&file_entry.path).map_err(|e| PapercutError::FileRead {
                 path: file_entry.path.display().to_string(),
                 source: e,
             })?;
 
         // Get file path for header and update current filename for header/footer
-        let file_path_str = file_entry.path.display().to_string();
-        current_filename = file_path_str.clone();
+        let file_path_str = file_entry.display_name();
+        current_filename = file_entry.path.display().to_string();
 
         // Add separator line above file header
         let mut path_builder = PathBuilder::new();
@@ -664,14 +824,18 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                 &content,
                 &file_entry.path,
                 &config.syntax_highlighting.theme,
-                &warning_manager
+                &config.syntax_highlighting.custom_syntaxes,
+                &warning_manager,
             ) {
                 Ok(result) => Some(result),
                 Err(e) => {
                     warning_manager.warnf(
                         crate::warnings::WarningCategory::Highlighting,
-                        format!("Syntax highlighting failed for '{}': {}. Falling back to plain text.",
-                            file_entry.path.display(), e)
+                        format!(
+                            "Syntax highlighting failed for '{}': {}. Falling back to plain text.",
+                            file_entry.path.display(),
+                            e
+                        ),
                     );
                     None
                 }
@@ -680,10 +844,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
             None
         };
 
-        #[cfg(not(feature = "syntax-highlighting"))]
-        let highlighted: Option<Vec<Vec<highlighting::StyledSegment>>> = None;
-
-        if let Some(styled_lines) = highlighted {
+        #[cfg(feature = "syntax-highlighting")]
+        let rendered_highlighted = if let Some(styled_lines) = highlighted {
             // Calculate max chars for wrapping
             let available_width = ctx.content_width - line_num_width;
             let char_width = font_size * 0.6;
@@ -781,8 +943,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                             ctx.page_height_mm,
                             ctx.margin_bottom,
                             ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                            ctx.page_width_mm,
+                            ctx.margin_right,
                         )?;
 
                         surface.finish();
@@ -809,13 +971,21 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                             ctx.margin_left,
                             ctx.margin_top,
                             ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                            ctx.page_width_mm,
+                            ctx.margin_right,
                         )?;
                     }
                 }
             }
+            true
         } else {
+            false
+        };
+
+        #[cfg(not(feature = "syntax-highlighting"))]
+        let rendered_highlighted = false;
+
+        if !rendered_highlighted {
             // Fallback to plain text rendering
             let lines: Vec<&str> = content.lines().collect();
             let available_width = ctx.content_width - line_num_width;
@@ -933,8 +1103,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                             ctx.page_height_mm,
                             ctx.margin_bottom,
                             ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                            ctx.page_width_mm,
+                            ctx.margin_right,
                         )?;
 
                         surface.finish();
@@ -961,8 +1131,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
                             ctx.margin_left,
                             ctx.margin_top,
                             ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                            ctx.page_width_mm,
+                            ctx.margin_right,
                         )?;
                     }
                 }
@@ -1029,8 +1199,8 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         ctx.page_height_mm,
         ctx.margin_bottom,
         ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+        ctx.page_width_mm,
+        ctx.margin_right,
     )?;
 
     // Finish last page
@@ -1042,12 +1212,6 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
         println!("Rendering PDF to: {}", output_path.display());
     }
 
-    // Check if file exists and prompt user (or fail if non-interactive)
-    if !should_overwrite_file(&output_path, force)? {
-        println!("Skipping file.");
-        return Ok(());
-    }
-
     ctx.save(&output_path)?;
 
     println!("✓ Generated: {}", output_path.display());
@@ -1056,9 +1220,25 @@ fn generate_single_pdf(config: Config, verbose: bool, force: bool, warning_manag
 }
 
 /// Generate multiple PDFs, one per file
-fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_manager: Arc<WarningManager>) -> Result<()> {
+fn generate_multiple_pdfs(
+    config: Config,
+    verbose: bool,
+    force: bool,
+    warning_manager: Arc<WarningManager>,
+) -> Result<()> {
     if verbose {
         println!("Generating {} separate PDFs", config.expanded_files.len());
+    }
+
+    let output_paths = multiple_output_paths(&config);
+    let mut selected_outputs = Vec::with_capacity(output_paths.len());
+    for output_path in output_paths {
+        if should_overwrite_file(&output_path, force)? {
+            selected_outputs.push(Some(output_path));
+        } else {
+            println!("Skipping file: {}", output_path.display());
+            selected_outputs.push(None);
+        }
     }
 
     // Create progress bar if processing multiple files and not in verbose mode
@@ -1068,30 +1248,39 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
             ProgressStyle::default_bar()
                 .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
                 .expect("Invalid progress bar template")
-                .progress_chars("=>-")
+                .progress_chars("=>-"),
         );
         Some(pb)
     } else {
         None
     };
 
-    for (idx, file_entry) in config.expanded_files.iter().enumerate() {
+    for (idx, (file_entry, output_path)) in config
+        .expanded_files
+        .iter()
+        .zip(selected_outputs)
+        .enumerate()
+    {
+        let Some(output_path) = output_path else {
+            continue;
+        };
         if verbose {
-            println!("  Processing file {}/{}: {}",
+            println!(
+                "  Processing file {}/{}: {}",
                 idx + 1,
                 config.expanded_files.len(),
                 file_entry.path.display()
             );
         } else if let Some(ref pb) = progress {
-            pb.set_message(format!("{}", file_entry.path.file_name().unwrap_or_default().to_string_lossy()));
+            pb.set_message(format!(
+                "{}",
+                file_entry
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+            ));
         }
-
-        // Create output filename
-        let output_filename = file_entry.path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("output");
-        let output_path = config.output.directory.join(format!("{}.pdf", output_filename));
 
         let mut ctx = PdfContext::new(config.clone(), Arc::clone(&warning_manager))?;
 
@@ -1099,7 +1288,9 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let effective_metadata = config.effective_metadata();
         ctx.set_metadata(&effective_metadata);
 
-        let font = ctx.font_manager.get_monospace_font()?;
+        let font = ctx
+            .font_manager
+            .get_monospace_font(config.page.font_family.as_deref())?;
         let hf_font = ctx.font_manager.get_header_footer_font()?;
 
         // For multiple mode, calculate pages for this single file
@@ -1113,7 +1304,11 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         let lines_per_page = ((ctx.content_height) / line_height).floor() as usize;
         let total_pages = if lines_per_page > 0 {
             let content_pages = single_file_line_count.div_ceil(lines_per_page);
-            if config.cover_page.enabled { content_pages + 1 } else { content_pages.max(1) }
+            if config.cover_page.enabled {
+                content_pages + 1
+            } else {
+                content_pages.max(1)
+            }
         } else {
             1
         };
@@ -1149,8 +1344,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                 ctx.margin_left,
                 ctx.margin_top,
                 ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                ctx.page_width_mm,
+                ctx.margin_right,
             )?;
 
             cover_page::render_cover_page(
@@ -1173,8 +1368,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                 ctx.page_height_mm,
                 ctx.margin_bottom,
                 ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                ctx.page_width_mm,
+                ctx.margin_right,
             )?;
 
             // Finish cover page and start a new page for content
@@ -1201,8 +1396,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                 ctx.margin_left,
                 ctx.margin_top,
                 ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                ctx.page_width_mm,
+                ctx.margin_right,
             )?;
         } else {
             // No cover page - render header on first page
@@ -1220,8 +1415,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                 ctx.margin_left,
                 ctx.margin_top,
                 ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                ctx.page_width_mm,
+                ctx.margin_right,
             )?;
         }
 
@@ -1242,8 +1437,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         }
 
         // Read file content
-        let content = fs::read_to_string(&file_entry.path)
-            .map_err(|e| PapercutError::FileRead {
+        let content =
+            fs::read_to_string(&file_entry.path).map_err(|e| PapercutError::FileRead {
                 path: file_entry.path.display().to_string(),
                 source: e,
             })?;
@@ -1400,8 +1595,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                         ctx.page_height_mm,
                         ctx.margin_bottom,
                         ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                        ctx.page_width_mm,
+                        ctx.margin_right,
                     )?;
 
                     surface.finish();
@@ -1428,8 +1623,8 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
                         ctx.margin_left,
                         ctx.margin_top,
                         ctx.content_width,
-            ctx.page_width_mm,
-            ctx.margin_right,
+                        ctx.page_width_mm,
+                        ctx.margin_right,
                     )?;
                 }
             }
@@ -1475,12 +1670,6 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
         surface.finish();
         page.finish();
 
-        // Check if file exists and prompt user (or fail if non-interactive)
-        if !should_overwrite_file(&output_path, force)? {
-            println!("Skipping file: {}", output_path.display());
-            continue;
-        }
-
         // Save
         ctx.save(&output_path)?;
 
@@ -1498,4 +1687,41 @@ fn generate_multiple_pdfs(config: Config, verbose: bool, force: bool, warning_ma
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disambiguates_duplicate_output_stems() {
+        let mut config: Config = serde_saphyr::from_str(
+            r#"
+output:
+  mode: multiple
+  directory: output
+files:
+  - path: one/config.rs
+"#,
+        )
+        .expect("config structure should deserialize");
+        config.expanded_files = vec![
+            crate::config::ExpandedFileEntry {
+                path: PathBuf::from("one/config.rs"),
+                title: None,
+            },
+            crate::config::ExpandedFileEntry {
+                path: PathBuf::from("two/config.rs"),
+                title: None,
+            },
+        ];
+
+        assert_eq!(
+            multiple_output_paths(&config),
+            vec![
+                PathBuf::from("output/config-1.pdf"),
+                PathBuf::from("output/config-2.pdf")
+            ]
+        );
+    }
 }

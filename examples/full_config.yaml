@@ -24,7 +24,7 @@ files:
 
   # Example 1: Directory scanning with filters
   # Scans the entire 'src' directory recursively
-  - path: src/
+  - path: ../src/
     # Only include Rust files
     include_types: ["rs"]
     # Exclude test files and build artifacts
@@ -34,22 +34,22 @@ files:
 
   # Example 2: Glob pattern to match multiple files
   # Matches all YAML files in examples/ directory
-  - path: "examples/*.yaml"
+  - path: "*.yaml"
     title: "Configuration Examples"
 
   # Example 3: Individual files with custom titles
-  - path: README.md
+  - path: ../README.md
     title: "Project Documentation"
 
-  - path: LICENSE
+  - path: ../LICENSE
     title: "License Agreement"
 
-  - path: Cargo.toml
+  - path: ../Cargo.toml
     title: "Project Manifest"
 
   # Example 4: Pattern with wildcards
   # Matches all markdown files in docs directory
-  - path: "docs/*.md"
+  - path: "../docs/*.md"
     title: "Documentation"
 
 # ===== SYNTAX HIGHLIGHTING =====
@@ -79,6 +79,11 @@ page:
     bottom: "1in"     # 1 inch
     left: "2.0cm"     # 2.0 cm (explicit)
     right: 2.0        # 2.0 cm
+
+  # Font family for source code (optional)
+  # If not specified, auto-detects from: Consolas, Monaco, Menlo, DejaVu Sans Mono, etc.
+  # Common options: "JetBrains Mono", "Fira Code", "Source Code Pro", "Consolas", "Monaco"
+  # font_family: "JetBrains Mono"
 
   # Font size for code content (in points)
   # Typical values: 8-12
@@ -126,7 +131,7 @@ cover_page:
   # Main title displayed prominently on the cover page
   title: "Source Code Documentation"
 
-  # Author(s) displayed below the title (supports single string or list)
+  # Author(s) displayed below the title (supports string or list)
   # Single author: authors: "John Doe"
   # Multiple authors (shown one per line):
   authors:

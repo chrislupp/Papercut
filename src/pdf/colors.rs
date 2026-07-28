@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -56,7 +56,12 @@ mod tests {
     #[cfg(feature = "syntax-highlighting")]
     #[test]
     fn test_syntect_to_paint() {
-        let color = SyntectColor { r: 255, g: 0, b: 0, a: 255 };
+        let color = SyntectColor {
+            r: 255,
+            g: 0,
+            b: 0,
+            a: 255,
+        };
         let _paint = syntect_to_paint(color);
         // Paint doesn't expose internal structure for testing
     }

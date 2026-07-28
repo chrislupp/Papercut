@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -32,6 +32,8 @@ mod fonts;
 mod generator;
 mod header_footer;
 mod krilla_doc;
+mod markdown_renderer;
+#[cfg(feature = "syntax-highlighting")]
 pub mod themes;
 
 pub use generator::generate;

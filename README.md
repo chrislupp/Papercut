@@ -2,6 +2,9 @@
 
 Convert source code files to PDF with configurable headers, footers, and formatting.
 
+Relative paths are resolved from the configuration file's directory, so a configuration behaves
+consistently regardless of the shell's current working directory.
+
 ## Quick Start
 
 ### Installation
@@ -10,20 +13,22 @@ Convert source code files to PDF with configurable headers, footers, and formatt
 
 1. Download the latest `Papercut-X.X.X.dmg` from the [releases page](https://github.com/chrislupp/papercut/releases)
 2. Open the DMG and drag `Papercut.app` to your Applications folder
-3. (Optional) Double-click `Install CLI Tool` to add `papercut` to your PATH
+3. (Optional) Add to PATH for terminal access:
+   ```bash
+   sudo ln -sf /Applications/Papercut.app/Contents/MacOS/papercut /usr/local/bin/papercut
+   ```
 4. Run from terminal:
-
-```bash
-papercut --config config.yaml
-```
+   ```bash
+   papercut --config config.yaml
+   ```
 
 To uninstall: Delete Papercut.app and run `sudo rm /usr/local/bin/papercut`
 
 #### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/papercut.git
-cd papercut
+git clone https://github.com/chrislupp/Papercut.git
+cd Papercut
 cargo install --path .
 ```
 
@@ -51,12 +56,15 @@ papercut --config config.yaml
 ### Features
 
 - **Cover Pages**: Optional cover page with title, description, location, date, and table of contents
+- **Markdown Reports**: Include markdown documentation with images and formatting before source code
 - **Directory Scanning & Glob Patterns**: Use wildcards (`*.rs`, `src/**/*.py`) and scan entire directories
 - **File Filtering**: Include/exclude specific file types and patterns
 - **Single or Multiple PDFs**: Combine all files or create separate PDFs
-- **Syntax Highlighting**: Optional syntax highlighting with multiple themes
+- **Syntax Highlighting**: Built-in themes (VS Code, JetBrains) plus custom syntax support
+- **Custom Fonts**: Specify preferred monospace font for source code rendering
 - **Customizable Headers/Footers**: Add page numbers, dates, filenames, and custom text
-- **Flexible Formatting**: Configure page size, margins, fonts, and colors
+- **Line Wrapping**: Automatic wrapping of long lines with configurable indentation
+- **Flexible Formatting**: Configure page size, margins, fonts, line numbers, and borders
 - **PDF Metadata**: Set title, author, subject, and keywords
 - **Robust Error Handling**: Detailed error messages with actionable suggestions
 - **Configurable Warnings**: Control warning output by category
@@ -71,6 +79,7 @@ See the `examples/` directory:
 - `full_config.yaml` - All available options with comments
 - `release_config.yaml` - Public release template
 - `patterns_config.yaml` - Directory scanning and pattern matching examples
+- `markdown_report/` - Markdown report with embedded images
 
 ### Documentation
 
@@ -149,7 +158,6 @@ The DMG will be created in the `dist/` directory.
 
 **What's included:**
 - `Papercut.app` - Application bundle containing the CLI tool
-- `Install CLI Tool.app` - Helper to add `papercut` to PATH
 
 **Optional: Code Signing and Notarization**
 

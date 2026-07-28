@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,16 +28,16 @@
 
 use crate::config::Config;
 use crate::error::Result;
-use crate::pdf::fonts::FontManager;
 use crate::pdf::colors::rgb_to_paint;
+use crate::pdf::fonts::FontManager;
+use chrono::Local;
 use krilla::annotation::{Annotation, LinkAnnotation, Target};
 use krilla::destination::{Destination, XyzDestination};
 use krilla::geom::{PathBuilder, Point, Rect};
 use krilla::page::Page;
 use krilla::paint::Stroke;
-use krilla::text::TextDirection;
 use krilla::surface::Surface;
-use chrono::Local;
+use krilla::text::TextDirection;
 
 /// Renders the main cover page (title, description, location, date)
 /// Returns Ok(()) - the TOC should be rendered on a separate page
@@ -152,7 +152,11 @@ pub fn render_cover_page(
         current_y += line_height + 5.0;
 
         // Draw description text
-        let lines = wrap_text(&config.cover_page.description, content_width, text_font_size);
+        let lines = wrap_text(
+            &config.cover_page.description,
+            content_width,
+            text_font_size,
+        );
         for line in lines {
             surface.draw_text(
                 Point::from_xy(margin_left, current_y),
@@ -269,9 +273,7 @@ pub fn render_toc_page(
         }
 
         // Get the display path - use relative path if available, otherwise filename
-        let display_path = file_entry.path
-            .to_string_lossy()
-            .to_string();
+        let display_path = file_entry.display_name();
 
         let toc_entry = format!("{:>3}. {}", idx + 1, display_path);
 
@@ -298,7 +300,7 @@ pub fn render_toc_page(
             // Create rectangle for clickable area (x, y is top-left in krilla coordinates)
             if let Some(rect) = Rect::from_xywh(
                 margin_left,
-                current_y - list_font_size,  // Top of text line
+                current_y - list_font_size, // Top of text line
                 text_width.min(content_width),
                 line_height,
             ) {

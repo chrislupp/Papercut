@@ -9,25 +9,25 @@ output:
 
 files:
   # Scan entire src directory, only include Rust files
-  - path: src/
+  - path: ../src/
     include_types: ["rs"]
     exclude:
       - "target/**"      # Exclude build directory
 
   # Include all YAML config files from examples
-  - path: "examples/*.yaml"
+  - path: "*.yaml"
     title: "Configuration Examples"
 
   # Include documentation files from docs
-  - path: "docs/*.md"
+  - path: "../docs/*.md"
     title: "Documentation"
 
   # Include root markdown files
-  - path: "*.md"
+  - path: "../*.md"
     title: "Project Documentation"
 
   # Specific important files
-  - path: Cargo.toml
+  - path: ../Cargo.toml
     title: "Project Manifest"
 
 syntax_highlighting:

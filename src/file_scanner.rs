@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
 // control over the information you may find at these locations.
 
 use crate::error::{PapercutError, Result};
-use crate::warnings::{WarningManager, WarningCategory};
+use crate::warnings::{WarningCategory, WarningManager};
 use glob::Pattern;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -43,9 +43,9 @@ pub fn expand_file_patterns(
     let mut files = Vec::new();
 
     // Check if path contains glob patterns
-    let path_str = path.to_str().ok_or_else(|| {
-        PapercutError::Config(format!("Invalid path: {}", path.display()))
-    })?;
+    let path_str = path
+        .to_str()
+        .ok_or_else(|| PapercutError::Config(format!("Invalid path: {}", path.display())))?;
 
     if contains_glob_pattern(path_str) {
         // Expand glob pattern
@@ -89,7 +89,10 @@ fn expand_glob_pattern(pattern: &str) -> Result<Vec<PathBuf>> {
                 }
             }
             Err(e) => {
-                return Err(PapercutError::Config(format!("Error reading glob entry: {}", e)));
+                return Err(PapercutError::Config(format!(
+                    "Error reading glob entry: {}",
+                    e
+                )));
             }
         }
     }
@@ -101,10 +104,7 @@ fn expand_glob_pattern(pattern: &str) -> Result<Vec<PathBuf>> {
 fn scan_directory(dir: &Path, warning_manager: &Arc<WarningManager>) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
 
-    for entry_result in WalkDir::new(dir)
-        .follow_links(false)
-        .into_iter()
-    {
+    for entry_result in WalkDir::new(dir).follow_links(false).into_iter() {
         match entry_result {
             Ok(entry) => {
                 if entry.file_type().is_file() {
@@ -115,7 +115,7 @@ fn scan_directory(dir: &Path, warning_manager: &Arc<WarningManager>) -> Result<V
                 // Warn about directory walking errors (permission denied, broken symlinks, etc.)
                 warning_manager.warnf(
                     WarningCategory::Filesystem,
-                    format!("Error accessing path during directory scan: {}", e)
+                    format!("Error accessing path during directory scan: {}", e),
                 );
             }
         }
@@ -179,7 +179,7 @@ fn apply_exclusion_patterns(
                     // Warn about non-UTF-8 path
                     warning_manager.warnf(
                         WarningCategory::Filesystem,
-                        format!("Skipping file with non-UTF-8 path: {}", path.display())
+                        format!("Skipping file with non-UTF-8 path: {}", path.display()),
                     );
                     // Exclude non-UTF-8 paths as we can't reliably match them
                     false

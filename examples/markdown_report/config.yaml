@@ -1,0 +1,30 @@
+output:
+  mode: single
+  directory: ./output
+  filename: markdown_report_example.pdf
+
+files:
+  - path: sample.rs
+
+markdown_report:
+  enabled: true
+  path: report.md
+
+cover_page:
+  enabled: true
+  title: Markdown Report Example
+  authors: Papercut Team
+  description: |
+    This example demonstrates the markdown report feature of Papercut.
+    The report content is rendered directly to the PDF after the cover page
+    and table of contents, before the source code listings.
+
+page:
+  size: A4
+  margins:
+    top: 2.5
+    bottom: 2.5
+    left: 2.0
+    right: 2.0
+  font_size: 10
+  line_numbers: true

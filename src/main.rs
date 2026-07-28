@@ -1,5 +1,5 @@
 // Papercut - Source code to PDF converter
-// Copyright (C) 2026 Papercut Contributors
+// Copyright (C) 2025-2026 Christopher A. Lupp
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@ mod warnings;
 mod highlighting;
 
 use clap::Parser;
-use std::path::PathBuf;
-use std::sync::Arc;
 use config::Config;
 use error::Result;
-use warnings::{WarningManager, WarningCategory};
+use std::path::PathBuf;
+use std::sync::Arc;
+use warnings::{WarningCategory, WarningManager};
 
 /// Convert source code files to PDF with configurable headers and footers
 #[derive(Parser, Debug)]
@@ -72,6 +72,11 @@ struct Args {
     #[cfg(feature = "syntax-highlighting")]
     #[arg(long)]
     list_themes: bool,
+
+    /// List available syntax definitions (requires syntax-highlighting feature)
+    #[cfg(feature = "syntax-highlighting")]
+    #[arg(long)]
+    list_syntaxes: bool,
 }
 
 fn main() -> Result<()> {
@@ -83,6 +88,23 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    #[cfg(feature = "syntax-highlighting")]
+    if args.list_syntaxes {
+        // Determine config file path for loading custom_syntaxes
+        let default_config = PathBuf::from(".papercut.yaml");
+        let config_path = args.config.as_ref().unwrap_or(&default_config);
+
+        let custom_syntaxes = if config_path.exists() {
+            Config::from_file_with_warnings(config_path, false)
+                .map(|c| c.syntax_highlighting.custom_syntaxes)
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        highlighting::list_syntaxes(&custom_syntaxes);
+        return Ok(());
+    }
+
     // Determine config file path
     let default_config = PathBuf::from(".papercut.yaml");
     let config_path = args.config.as_ref().unwrap_or(&default_config);
@@ -91,7 +113,7 @@ fn main() -> Result<()> {
     if !config_path.exists() {
         if args.config.is_some() {
             return Err(error::PapercutError::FileNotFound(
-                config_path.display().to_string()
+                config_path.display().to_string(),
             ));
         } else {
             return Err(error::PapercutError::Config(
@@ -105,7 +127,7 @@ fn main() -> Result<()> {
         println!("Loading configuration from: {}", config_path.display());
     }
 
-    let config = Config::from_file(config_path)?;
+    let config = Config::from_file_with_warnings(config_path, !args.quiet)?;
 
     if args.verbose {
         println!("Configuration loaded successfully");
