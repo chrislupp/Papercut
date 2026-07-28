@@ -935,6 +935,10 @@ mod tests {
     #[test]
     fn resolves_paths_preserves_titles_and_deduplicates_files() {
         let temp = tempfile::tempdir().expect("temporary directory should be created");
+        let temp_path = temp
+            .path()
+            .canonicalize()
+            .expect("temporary directory should be canonicalizable");
         fs::create_dir(temp.path().join("src")).expect("source directory should be created");
         fs::write(temp.path().join("src/main.rs"), "fn main() {}")
             .expect("source file should be writable");
@@ -963,12 +967,9 @@ markdown_report:
             config.expanded_files[0].title.as_deref(),
             Some("Main entry point")
         );
-        assert_eq!(
-            config.expanded_files[0].path,
-            temp.path().join("src/main.rs")
-        );
-        assert_eq!(config.output.directory, temp.path().join("output"));
-        assert_eq!(config.markdown_report.path, temp.path().join("report.md"));
+        assert_eq!(config.expanded_files[0].path, temp_path.join("src/main.rs"));
+        assert_eq!(config.output.directory, temp_path.join("output"));
+        assert_eq!(config.markdown_report.path, temp_path.join("report.md"));
     }
 
     #[test]
