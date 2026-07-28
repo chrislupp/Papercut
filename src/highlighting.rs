@@ -337,7 +337,7 @@ pub fn list_syntaxes(config_syntaxes: &[PathBuf]) {
     println!();
 
     let mut syntaxes: Vec<_> = ss.syntaxes().iter().collect();
-    syntaxes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    syntaxes.sort_by_key(|syntax| syntax.name.to_lowercase());
 
     for syntax in syntaxes {
         let exts: Vec<_> = syntax.file_extensions.iter().map(|s| s.as_str()).collect();

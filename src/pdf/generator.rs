@@ -1258,7 +1258,7 @@ fn generate_multiple_pdfs(
     for (idx, (file_entry, output_path)) in config
         .expanded_files
         .iter()
-        .zip(selected_outputs.into_iter())
+        .zip(selected_outputs)
         .enumerate()
     {
         let Some(output_path) = output_path else {
