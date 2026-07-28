@@ -36,11 +36,11 @@ mod warnings;
 mod highlighting;
 
 use clap::Parser;
-use std::path::PathBuf;
-use std::sync::Arc;
 use config::Config;
 use error::Result;
-use warnings::{WarningManager, WarningCategory};
+use std::path::PathBuf;
+use std::sync::Arc;
+use warnings::{WarningCategory, WarningManager};
 
 /// Convert source code files to PDF with configurable headers and footers
 #[derive(Parser, Debug)]
@@ -95,7 +95,7 @@ fn main() -> Result<()> {
         let config_path = args.config.as_ref().unwrap_or(&default_config);
 
         let custom_syntaxes = if config_path.exists() {
-            Config::from_file(config_path)
+            Config::from_file_with_warnings(config_path, false)
                 .map(|c| c.syntax_highlighting.custom_syntaxes)
                 .unwrap_or_default()
         } else {
@@ -113,7 +113,7 @@ fn main() -> Result<()> {
     if !config_path.exists() {
         if args.config.is_some() {
             return Err(error::PapercutError::FileNotFound(
-                config_path.display().to_string()
+                config_path.display().to_string(),
             ));
         } else {
             return Err(error::PapercutError::Config(
@@ -127,7 +127,7 @@ fn main() -> Result<()> {
         println!("Loading configuration from: {}", config_path.display());
     }
 
-    let config = Config::from_file(config_path)?;
+    let config = Config::from_file_with_warnings(config_path, !args.quiet)?;
 
     if args.verbose {
         println!("Configuration loaded successfully");

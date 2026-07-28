@@ -27,7 +27,7 @@
 // control over the information you may find at these locations.
 
 use crate::error::{PapercutError, Result};
-use crate::warnings::{WarningManager, WarningCategory};
+use crate::warnings::{WarningCategory, WarningManager};
 use fontdb::{Database, Query, Source};
 use krilla::text::Font;
 use std::sync::Arc;
@@ -78,7 +78,7 @@ impl FontManager {
                 format!(
                     "Preferred font '{}' not found, falling back to system defaults",
                     preferred_family
-                )
+                ),
             );
         }
 
@@ -104,7 +104,8 @@ impl FontManager {
 
         Err(PapercutError::InvalidConfig(
             "Could not find any suitable monospace font. Please install a monospace font like \
-             Consolas, Monaco, or DejaVu Sans Mono.".to_string()
+             Consolas, Monaco, or DejaVu Sans Mono."
+                .to_string(),
         ))
     }
 
@@ -233,7 +234,7 @@ impl FontManager {
                     Err(e) => {
                         self.warning_manager.warnf(
                             WarningCategory::Fonts,
-                            format!("Failed to read font file '{}': {}", path.display(), e)
+                            format!("Failed to read font file '{}': {}", path.display(), e),
                         );
                         None
                     }
@@ -246,7 +247,11 @@ impl FontManager {
                     Err(e) => {
                         self.warning_manager.warnf(
                             WarningCategory::Fonts,
-                            format!("Failed to read shared font file '{}': {}", path.display(), e)
+                            format!(
+                                "Failed to read shared font file '{}': {}",
+                                path.display(),
+                                e
+                            ),
                         );
                         None
                     }

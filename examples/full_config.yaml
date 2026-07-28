@@ -24,7 +24,7 @@ files:
 
   # Example 1: Directory scanning with filters
   # Scans the entire 'src' directory recursively
-  - path: src/
+  - path: ../src/
     # Only include Rust files
     include_types: ["rs"]
     # Exclude test files and build artifacts
@@ -34,22 +34,22 @@ files:
 
   # Example 2: Glob pattern to match multiple files
   # Matches all YAML files in examples/ directory
-  - path: "examples/*.yaml"
+  - path: "*.yaml"
     title: "Configuration Examples"
 
   # Example 3: Individual files with custom titles
-  - path: README.md
+  - path: ../README.md
     title: "Project Documentation"
 
-  - path: LICENSE
+  - path: ../LICENSE
     title: "License Agreement"
 
-  - path: Cargo.toml
+  - path: ../Cargo.toml
     title: "Project Manifest"
 
   # Example 4: Pattern with wildcards
   # Matches all markdown files in docs directory
-  - path: "docs/*.md"
+  - path: "../docs/*.md"
     title: "Documentation"
 
 # ===== SYNTAX HIGHLIGHTING =====

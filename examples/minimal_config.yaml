@@ -8,9 +8,9 @@ output:
   filename: output.pdf
 
 files:
-  - path: src/main.rs
-  - path: src/config.rs
-  - path: README.md
+  - path: ../src/main.rs
+  - path: ../src/config.rs
+  - path: ../README.md
 
 # Simple cover page (most fields use defaults)
 cover_page:

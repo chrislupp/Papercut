@@ -8,15 +8,15 @@ output:
   filename: source_code_release_2024.pdf
 
 files:
-  - path: src/main.rs
+  - path: ../src/main.rs
     title: "Main Application"
-  - path: src/config.rs
+  - path: ../src/config.rs
     title: "Configuration Module"
-  - path: src/error.rs
+  - path: ../src/error.rs
     title: "Error Handling"
-  - path: LICENSE
+  - path: ../LICENSE
     title: "License Agreement"
-  - path: README.md
+  - path: ../README.md
     title: "Documentation"
 
 syntax_highlighting:

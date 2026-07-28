@@ -26,15 +26,15 @@
 // therein. The DoD does not exercise any editorial, security, or other
 // control over the information you may find at these locations.
 
-use std::path::{Path, PathBuf};
-use syntect::easy::HighlightLines;
-use syntect::highlighting::{ThemeSet, Style, Color, Theme};
-use syntect::parsing::{SyntaxSet, SyntaxSetBuilder, SyntaxDefinition};
-use syntect::util::LinesWithEndings;
 use crate::pdf::themes::ThemePreset;
-use crate::warnings::{WarningManager, WarningCategory};
+use crate::warnings::{WarningCategory, WarningManager};
 use std::fs;
 use std::io::Cursor;
+use std::path::{Path, PathBuf};
+use syntect::easy::HighlightLines;
+use syntect::highlighting::{Color, Style, Theme, ThemeSet};
+use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxSetBuilder};
+use syntect::util::LinesWithEndings;
 
 /// Represents a styled text segment
 #[derive(Debug, Clone)]
@@ -48,10 +48,7 @@ pub struct StyledSegment {
 }
 
 /// Build SyntaxSet with defaults + embedded CMake + config syntaxes + convention dirs
-fn build_syntax_set(
-    config_syntaxes: &[PathBuf],
-    warning_manager: &WarningManager
-) -> SyntaxSet {
+fn build_syntax_set(config_syntaxes: &[PathBuf], warning_manager: &WarningManager) -> SyntaxSet {
     let mut builder = SyntaxSet::load_defaults_newlines().into_builder();
 
     // 1. Add embedded CMake syntax
@@ -60,7 +57,7 @@ fn build_syntax_set(
         Ok(syntax) => builder.add(syntax),
         Err(e) => warning_manager.warnf(
             WarningCategory::Highlighting,
-            format!("Failed to load embedded CMake syntax: {}", e)
+            format!("Failed to load embedded CMake syntax: {}", e),
         ),
     }
 
@@ -72,7 +69,7 @@ fn build_syntax_set(
         if !expanded_path.exists() {
             warning_manager.warnf(
                 WarningCategory::Highlighting,
-                format!("Custom syntax path not found: {}", path.display())
+                format!("Custom syntax path not found: {}", path.display()),
             );
             continue;
         }
@@ -82,7 +79,11 @@ fn build_syntax_set(
             if let Err(e) = builder.add_from_folder(&expanded_path, true) {
                 warning_manager.warnf(
                     WarningCategory::Highlighting,
-                    format!("Failed to load syntaxes from '{}': {}", expanded_path.display(), e)
+                    format!(
+                        "Failed to load syntaxes from '{}': {}",
+                        expanded_path.display(),
+                        e
+                    ),
                 );
             }
         } else {
@@ -96,7 +97,7 @@ fn build_syntax_set(
         if let Err(e) = builder.add_from_folder(&dir, true) {
             warning_manager.warnf(
                 WarningCategory::Highlighting,
-                format!("Failed to load syntaxes from '{}': {}", dir.display(), e)
+                format!("Failed to load syntaxes from '{}': {}", dir.display(), e),
             );
         }
     }
@@ -107,18 +108,16 @@ fn build_syntax_set(
 /// Load a single syntax file
 fn load_syntax_file(builder: &mut SyntaxSetBuilder, path: &Path, warning_manager: &WarningManager) {
     match fs::read_to_string(path) {
-        Ok(content) => {
-            match SyntaxDefinition::load_from_str(&content, true, None) {
-                Ok(syntax) => builder.add(syntax),
-                Err(e) => warning_manager.warnf(
-                    WarningCategory::Highlighting,
-                    format!("Failed to parse syntax '{}': {}", path.display(), e)
-                ),
-            }
-        }
+        Ok(content) => match SyntaxDefinition::load_from_str(&content, true, None) {
+            Ok(syntax) => builder.add(syntax),
+            Err(e) => warning_manager.warnf(
+                WarningCategory::Highlighting,
+                format!("Failed to parse syntax '{}': {}", path.display(), e),
+            ),
+        },
         Err(e) => warning_manager.warnf(
             WarningCategory::Highlighting,
-            format!("Failed to read syntax file '{}': {}", path.display(), e)
+            format!("Failed to read syntax file '{}': {}", path.display(), e),
         ),
     }
 }
@@ -126,9 +125,9 @@ fn load_syntax_file(builder: &mut SyntaxSetBuilder, path: &Path, warning_manager
 /// Expand ~ to home directory in path
 fn expand_tilde(path: &Path) -> PathBuf {
     if let Some(path_str) = path.to_str() {
-        if path_str.starts_with("~/") {
+        if let Some(relative_path) = path_str.strip_prefix("~/") {
             if let Some(home) = dirs::home_dir() {
-                return home.join(&path_str[2..]);
+                return home.join(relative_path);
             }
         }
     }
@@ -158,7 +157,8 @@ fn get_convention_syntax_dirs() -> Vec<PathBuf> {
 /// Search order: ./.papercut/themes/ → ~/.papercut/themes/
 fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Option<Theme> {
     // Try project-level .papercut folder first
-    let project_theme_path = PathBuf::from("./.papercut/themes").join(format!("{}.tmTheme", theme_name));
+    let project_theme_path =
+        PathBuf::from("./.papercut/themes").join(format!("{}.tmTheme", theme_name));
     if project_theme_path.exists() {
         match fs::read_to_string(&project_theme_path) {
             Ok(theme_data) => {
@@ -168,7 +168,11 @@ fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Opti
                     Err(e) => {
                         warning_manager.warnf(
                             WarningCategory::Themes,
-                            format!("Failed to parse custom theme '{}': {:?}", project_theme_path.display(), e)
+                            format!(
+                                "Failed to parse custom theme '{}': {:?}",
+                                project_theme_path.display(),
+                                e
+                            ),
                         );
                     }
                 }
@@ -176,7 +180,11 @@ fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Opti
             Err(e) => {
                 warning_manager.warnf(
                     WarningCategory::Themes,
-                    format!("Failed to read custom theme file '{}': {}", project_theme_path.display(), e)
+                    format!(
+                        "Failed to read custom theme file '{}': {}",
+                        project_theme_path.display(),
+                        e
+                    ),
                 );
             }
         }
@@ -184,7 +192,9 @@ fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Opti
 
     // Try user home .papercut folder
     if let Some(home_dir) = dirs::home_dir() {
-        let home_theme_path = home_dir.join(".papercut/themes").join(format!("{}.tmTheme", theme_name));
+        let home_theme_path = home_dir
+            .join(".papercut/themes")
+            .join(format!("{}.tmTheme", theme_name));
         if home_theme_path.exists() {
             match fs::read_to_string(&home_theme_path) {
                 Ok(theme_data) => {
@@ -194,7 +204,11 @@ fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Opti
                         Err(e) => {
                             warning_manager.warnf(
                                 WarningCategory::Themes,
-                                format!("Failed to parse custom theme '{}': {:?}", home_theme_path.display(), e)
+                                format!(
+                                    "Failed to parse custom theme '{}': {:?}",
+                                    home_theme_path.display(),
+                                    e
+                                ),
                             );
                         }
                     }
@@ -202,7 +216,11 @@ fn load_custom_theme(theme_name: &str, warning_manager: &WarningManager) -> Opti
                 Err(e) => {
                     warning_manager.warnf(
                         WarningCategory::Themes,
-                        format!("Failed to read custom theme file '{}': {}", home_theme_path.display(), e)
+                        format!(
+                            "Failed to read custom theme file '{}': {}",
+                            home_theme_path.display(),
+                            e
+                        ),
                     );
                 }
             }
@@ -218,7 +236,7 @@ pub fn highlight_code_styled(
     file_path: &Path,
     theme_name: &str,
     custom_syntaxes: &[PathBuf],
-    warning_manager: &WarningManager
+    warning_manager: &WarningManager,
 ) -> Result<Vec<Vec<StyledSegment>>, String> {
     // Load syntax set with custom syntaxes
     let ss = build_syntax_set(custom_syntaxes, warning_manager);
@@ -232,7 +250,8 @@ pub fn highlight_code_styled(
     // Theme loading order: built-in presets → custom .papercut themes → syntect defaults
     let theme = if let Some(preset) = ThemePreset::from_str(theme_name) {
         // 1. Use built-in theme preset
-        preset.load_theme()
+        preset
+            .load_theme()
             .ok_or_else(|| format!("Failed to load built-in theme preset '{}'", theme_name))?
     } else if let Some(custom_theme) = load_custom_theme(theme_name, warning_manager) {
         // 2. Use custom theme from .papercut folders
@@ -250,7 +269,8 @@ pub fn highlight_code_styled(
     let mut lines = Vec::new();
 
     for line in LinesWithEndings::from(code) {
-        let ranges: Vec<(Style, &str)> = h.highlight_line(line, &ss)
+        let ranges: Vec<(Style, &str)> = h
+            .highlight_line(line, &ss)
             .map_err(|e| format!("Highlighting error: {}", e))?;
 
         let mut segments = Vec::new();
@@ -259,9 +279,15 @@ pub fn highlight_code_styled(
                 text: text.to_string(),
                 foreground: style.foreground,
                 background: style.background,
-                bold: style.font_style.contains(syntect::highlighting::FontStyle::BOLD),
-                italic: style.font_style.contains(syntect::highlighting::FontStyle::ITALIC),
-                underline: style.font_style.contains(syntect::highlighting::FontStyle::UNDERLINE),
+                bold: style
+                    .font_style
+                    .contains(syntect::highlighting::FontStyle::BOLD),
+                italic: style
+                    .font_style
+                    .contains(syntect::highlighting::FontStyle::ITALIC),
+                underline: style
+                    .font_style
+                    .contains(syntect::highlighting::FontStyle::UNDERLINE),
             });
         }
         lines.push(segments);
@@ -311,12 +337,10 @@ pub fn list_syntaxes(config_syntaxes: &[PathBuf]) {
     println!();
 
     let mut syntaxes: Vec<_> = ss.syntaxes().iter().collect();
-    syntaxes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    syntaxes.sort_by_key(|syntax| syntax.name.to_lowercase());
 
     for syntax in syntaxes {
-        let exts: Vec<_> = syntax.file_extensions.iter()
-            .map(|s| s.as_str())
-            .collect();
+        let exts: Vec<_> = syntax.file_extensions.iter().map(|s| s.as_str()).collect();
         let exts_str = exts.join(", ");
         if exts_str.is_empty() {
             println!("  - {}", syntax.name);

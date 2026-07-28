@@ -4,11 +4,11 @@ output:
   filename: markdown_report_example.pdf
 
 files:
-  - path: ./examples/markdown_report/sample.rs
+  - path: sample.rs
 
 markdown_report:
   enabled: true
-  path: ./examples/markdown_report/report.md
+  path: report.md
 
 cover_page:
   enabled: true

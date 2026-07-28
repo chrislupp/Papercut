@@ -118,17 +118,18 @@ impl PdfContext {
     /// Finish the document and write to file
     pub fn save(self, path: &Path) -> Result<()> {
         // Finish and get PDF bytes
-        let pdf_bytes = self.document
-            .finish()
-            .map_err(|e| PapercutError::PdfGeneration(
-                format!("Failed to finish PDF document: {:?}", e)
-            ))?;
+        let pdf_bytes = self.document.finish().map_err(|e| {
+            PapercutError::PdfGeneration(format!("Failed to finish PDF document: {:?}", e))
+        })?;
 
         // Write to file
-        std::fs::write(path, pdf_bytes)
-            .map_err(|e| PapercutError::PdfGeneration(
-                format!("Failed to write PDF to '{}': {}", path.display(), e)
-            ))?;
+        std::fs::write(path, pdf_bytes).map_err(|e| {
+            PapercutError::PdfGeneration(format!(
+                "Failed to write PDF to '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
 
         Ok(())
     }
@@ -137,9 +138,8 @@ impl PdfContext {
 /// Get page size in points (PDF standard: 1 point = 1/72 inch)
 fn get_page_size_points(size: &PageSize) -> (f32, f32) {
     match size {
-        PageSize::A4 => (595.28, 841.89),      // 210mm x 297mm
-        PageSize::Letter => (612.0, 792.0),     // 8.5" x 11"
-        PageSize::Legal => (612.0, 1008.0),     // 8.5" x 14"
+        PageSize::A4 => (595.28, 841.89),   // 210mm x 297mm
+        PageSize::Letter => (612.0, 792.0), // 8.5" x 11"
+        PageSize::Legal => (612.0, 1008.0), // 8.5" x 14"
     }
 }
-
