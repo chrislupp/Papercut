@@ -33,6 +33,7 @@ mod generator;
 mod header_footer;
 mod krilla_doc;
 mod markdown_renderer;
+#[cfg(feature = "syntax-highlighting")]
 pub mod themes;
 
 pub use generator::generate;

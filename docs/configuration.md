@@ -36,12 +36,14 @@ output:
   - `multiple`: Create one PDF per source file
 
 - **directory** (optional, default: `./output`): Directory where PDFs will be saved
-  - Can be relative or absolute path
+  - Can be relative to the configuration file or an absolute path
   - Will be created if it doesn't exist
 
 - **filename** (optional, default: `output.pdf`): Output filename for single mode
   - Only used when `mode: single`
+  - Must be a filename, not a path; use `directory` to select its location
   - For multiple mode, filenames are derived from source files
+  - Duplicate source stems are numbered deterministically, such as `config-1.pdf` and `config-2.pdf`
 
 ## Files Configuration
 
@@ -70,12 +72,16 @@ files:
   - **Individual file**: `src/main.rs`
   - **Glob pattern**: `src/**/*.rs` (recursive), `src/*.rs` (non-recursive)
   - **Directory**: `src/` (scans recursively)
-  - Can be relative or absolute
+  - Can be relative to the configuration file or absolute
   - Use quotes for patterns with wildcards
 
 - **title** (optional): Custom title for this file/group in the PDF
   - If not specified, the filename will be used
   - Displayed as a separator in single-file mode
+  - For a glob or directory, the title is applied to every matched file
+
+Files selected by overlapping entries are included once. The first matching entry determines
+the file's position and custom title.
   - When using patterns, applies to all matched files
 
 - **include_types** (optional, default: all types): File extensions to include

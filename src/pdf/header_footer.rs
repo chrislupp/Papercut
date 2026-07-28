@@ -29,8 +29,8 @@
 use crate::config::HeaderFooterConfig;
 use crate::error::Result;
 use krilla::geom::Point;
-use krilla::text::{Font, TextDirection};
 use krilla::surface::Surface;
+use krilla::text::{Font, TextDirection};
 use std::sync::Arc;
 
 /// Context for rendering headers/footers on a single page
@@ -67,17 +67,23 @@ pub fn render_header(
     }
 
     // Apply margin overrides if specified
-    let effective_margin_left = config.margins.as_ref()
+    let effective_margin_left = config
+        .margins
+        .as_ref()
         .and_then(|m| m.left.as_ref())
         .map(|v| v.as_points())
         .unwrap_or(margin_left);
 
-    let effective_margin_top = config.margins.as_ref()
+    let effective_margin_top = config
+        .margins
+        .as_ref()
         .and_then(|m| m.top.as_ref())
         .map(|v| v.as_points())
         .unwrap_or(margin_top);
 
-    let effective_margin_right = config.margins.as_ref()
+    let effective_margin_right = config
+        .margins
+        .as_ref()
         .and_then(|m| m.right.as_ref())
         .map(|v| v.as_points())
         .unwrap_or(margin_right);
@@ -134,7 +140,10 @@ pub fn render_header(
     let right_lines = wrap_text(&right_text, section_width, font_size);
 
     // Find maximum number of lines to determine total height
-    let max_lines = left_lines.len().max(center_lines.len()).max(right_lines.len());
+    let max_lines = left_lines
+        .len()
+        .max(center_lines.len())
+        .max(right_lines.len());
     if max_lines == 0 {
         return Ok(());
     }
@@ -210,17 +219,23 @@ pub fn render_footer(
     }
 
     // Apply margin overrides if specified
-    let effective_margin_left = config.margins.as_ref()
+    let effective_margin_left = config
+        .margins
+        .as_ref()
         .and_then(|m| m.left.as_ref())
         .map(|v| v.as_points())
         .unwrap_or(margin_left);
 
-    let effective_margin_bottom = config.margins.as_ref()
+    let effective_margin_bottom = config
+        .margins
+        .as_ref()
         .and_then(|m| m.bottom.as_ref())
         .map(|v| v.as_points())
         .unwrap_or(margin_bottom);
 
-    let effective_margin_right = config.margins.as_ref()
+    let effective_margin_right = config
+        .margins
+        .as_ref()
         .and_then(|m| m.right.as_ref())
         .map(|v| v.as_points())
         .unwrap_or(margin_right);
@@ -242,7 +257,8 @@ pub fn render_footer(
         // Calculate starting Y position - center the block vertically in the bottom margin
         let total_height = lines.len() as f32 * line_height;
         let footer_area_start = page_height - effective_margin_bottom;
-        let start_y = footer_area_start + (effective_margin_bottom - total_height) / 2.0 + font_size;
+        let start_y =
+            footer_area_start + (effective_margin_bottom - total_height) / 2.0 + font_size;
 
         // Full-width text always uses left alignment (justified left)
         for (i, line) in lines.iter().enumerate() {
@@ -278,7 +294,10 @@ pub fn render_footer(
     let right_lines = wrap_text(&right_text, section_width, font_size);
 
     // Find maximum number of lines to determine total height
-    let max_lines = left_lines.len().max(center_lines.len()).max(right_lines.len());
+    let max_lines = left_lines
+        .len()
+        .max(center_lines.len())
+        .max(right_lines.len());
     if max_lines == 0 {
         return Ok(());
     }

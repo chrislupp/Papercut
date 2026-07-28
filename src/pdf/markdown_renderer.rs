@@ -410,8 +410,7 @@ pub fn render_markdown(
                                     surface.push_transform(&translate_transform);
 
                                     // Draw at scaled size
-                                    if let Some(size) =
-                                        Size::from_wh(display_width, display_height)
+                                    if let Some(size) = Size::from_wh(display_width, display_height)
                                     {
                                         let settings = SvgSettings::default();
                                         let _ = surface.draw_svg(&svg_tree, size, settings);
@@ -711,10 +710,7 @@ pub fn render_markdown(
                         current_y += 5.0;
                         for line in code_lines {
                             surface.draw_text(
-                                Point::from_xy(
-                                    ctx.margin_left + 10.0,
-                                    current_y + code_font_size,
-                                ),
+                                Point::from_xy(ctx.margin_left + 10.0, current_y + code_font_size),
                                 mono_font.as_ref().clone(),
                                 code_font_size,
                                 line,
@@ -1004,12 +1000,18 @@ fn calculate_line_breaks(
     // Push default styles
     builder.push_default(StyleProperty::FontSize(font_size));
     builder.push_default(StyleProperty::LineHeight(LineHeight::FontSizeRelative(1.5)));
-    builder.push_default(StyleProperty::FontStack(FontStack::Source(Cow::Borrowed("Arial"))));
+    builder.push_default(StyleProperty::FontStack(FontStack::Source(Cow::Borrowed(
+        "Arial",
+    ))));
 
     // Build the layout
     let mut layout: Layout<[u8; 4]> = builder.build(text);
     layout.break_all_lines(Some(max_width));
-    layout.align(Some(max_width), Alignment::Start, AlignmentOptions::default());
+    layout.align(
+        Some(max_width),
+        Alignment::Start,
+        AlignmentOptions::default(),
+    );
 
     // Extract line texts
     let mut lines = Vec::new();

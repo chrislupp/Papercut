@@ -56,7 +56,12 @@ mod tests {
     #[cfg(feature = "syntax-highlighting")]
     #[test]
     fn test_syntect_to_paint() {
-        let color = SyntectColor { r: 255, g: 0, b: 0, a: 255 };
+        let color = SyntectColor {
+            r: 255,
+            g: 0,
+            b: 0,
+            a: 255,
+        };
         let _paint = syntect_to_paint(color);
         // Paint doesn't expose internal structure for testing
     }
