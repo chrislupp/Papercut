@@ -143,8 +143,7 @@ jobs:
       - name: Update Cargo package version
         run: |
           sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.new_version }}"/' Cargo.toml
-          cargo metadata --no-deps --format-version 1 > /dev/null
-          cargo check --locked
+          cargo check
 
       - name: Update CHANGELOG.md
         if: steps.labels.outputs.prerelease == 'false'
