@@ -1,26 +1,12 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: 'Version bump type (use "promote" to release current prerelease as stable)'
-        required: true
-        type: choice
-        options:
-          - promote
-          - major
-          - minor
-          - patch
-      prerelease:
-        description: 'Prerelease type (leave empty for stable release)'
-        required: false
-        type: choice
-        options:
-          - ''
-          - alpha
-          - beta
-          - rc
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -28,6 +14,10 @@ permissions:
 jobs:
   release:
     name: Create Release
+    if: >
+      github.event.pull_request.merged == true &&
+      (contains(github.event.pull_request.labels.*.name, 'release') ||
+       contains(github.event.pull_request.labels.*.name, 'prerelease'))
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.new_version }}
@@ -35,9 +25,10 @@ jobs:
       prerelease: ${{ steps.labels.outputs.prerelease }}
 
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Setup GPG for signing
@@ -66,16 +57,68 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Parse release inputs
+      - name: Parse and validate release labels
         id: labels
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
         run: |
-          echo "bump=${{ inputs.bump }}" >> $GITHUB_OUTPUT
-          if [ -n "${{ inputs.prerelease }}" ]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-            echo "pretype=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
+          echo "Labels on PR: $LABELS"
+
+          RELEASE_COUNT=0
+          PRERELEASE=false
+          BUMP=""
+          BUMP_COUNT=0
+          PRETYPE=""
+          PRETYPE_COUNT=0
+
+          for label in $LABELS; do
+            case "$label" in
+              release)
+                RELEASE_COUNT=$((RELEASE_COUNT + 1))
+                ;;
+              prerelease)
+                RELEASE_COUNT=$((RELEASE_COUNT + 1))
+                PRERELEASE=true
+                ;;
+              major|minor|patch|promote)
+                BUMP="$label"
+                BUMP_COUNT=$((BUMP_COUNT + 1))
+                ;;
+              alpha|beta|rc)
+                PRETYPE="$label"
+                PRETYPE_COUNT=$((PRETYPE_COUNT + 1))
+                ;;
+            esac
+          done
+
+          if [ "$RELEASE_COUNT" -ne 1 ]; then
+            echo "::error::PR must have exactly one of 'release' or 'prerelease'."
+            exit 1
           fi
+
+          if [ "$BUMP_COUNT" -ne 1 ]; then
+            echo "::error::PR must have exactly one of 'major', 'minor', 'patch', or 'promote'."
+            exit 1
+          fi
+
+          if [ "$PRERELEASE" = "true" ] && [ "$PRETYPE_COUNT" -ne 1 ]; then
+            echo "::error::Prerelease PRs must have exactly one of 'alpha', 'beta', or 'rc'."
+            exit 1
+          fi
+
+          if [ "$PRERELEASE" = "false" ] && [ "$PRETYPE_COUNT" -ne 0 ]; then
+            echo "::error::Stable release PRs must not have 'alpha', 'beta', or 'rc'."
+            exit 1
+          fi
+
+          if [ "$PRERELEASE" = "true" ] && [ "$BUMP" = "promote" ]; then
+            echo "::error::The 'promote' label can only be used for a stable release."
+            exit 1
+          fi
+
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "pretype=$PRETYPE" >> "$GITHUB_OUTPUT"
 
       - name: Calculate new version
         id: version
