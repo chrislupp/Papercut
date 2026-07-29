@@ -9,6 +9,20 @@ consistently regardless of the shell's current working directory.
 
 ### Installation
 
+#### Homebrew (macOS and Linux)
+
+Install Papercut from its Homebrew tap:
+
+```bash
+brew install chrislupp/tools/papercut
+```
+
+Upgrade to the latest available version with:
+
+```bash
+brew upgrade papercut
+```
+
 #### macOS (DMG Installer)
 
 1. Download the latest `Papercut-X.X.X.dmg` from the [releases page](https://github.com/chrislupp/papercut/releases)
