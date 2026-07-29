@@ -140,9 +140,11 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update Cargo.toml
+      - name: Update Cargo package version
         run: |
           sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.new_version }}"/' Cargo.toml
+          cargo metadata --no-deps --format-version 1 > /dev/null
+          cargo check --locked
 
       - name: Update CHANGELOG.md
         if: steps.labels.outputs.prerelease == 'false'
@@ -163,7 +165,7 @@ jobs:
 
       - name: Commit and tag
         run: |
-          git add Cargo.toml CHANGELOG.md
+          git add Cargo.toml Cargo.lock CHANGELOG.md
           git commit -S -m "chore: release version ${{ steps.version.outputs.new_version }}"
           git tag -s "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
           git push origin main

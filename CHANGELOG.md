@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-07-28
-
 ### Added
 - Custom font family selection for source code
 - Markdown reports with vector and raster image support
@@ -22,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI regression tests for config-relative paths and overwrite protection
 
 ### Changed
+- Document Homebrew installation on macOS and Linux
 - Default syntax highlighting theme to `vscode-light`
 - Expanded configuration, styling, usage, and example documentation
 - Resolve relative paths from the configuration file's directory
@@ -30,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Check overwrite decisions before rendering PDFs
 
 ### Fixed
+- Release workflow now synchronizes the package version in `Cargo.lock`
 - Repository URLs in documentation
 - Build failures when syntax highlighting is disabled
 - Potential unsigned underflow while wrapping highlighted source lines
