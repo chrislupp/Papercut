@@ -123,9 +123,9 @@ jobs:
       - name: Calculate new version
         id: version
         run: |
-          # Parse current version from Cargo.toml
-          CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          echo "Current version: $CURRENT"
+          # Read the version before the release PR was merged.
+          CURRENT=$(git show HEAD^1:Cargo.toml | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Previous version: $CURRENT"
 
           # Split version
           MAJOR=$(echo "$CURRENT" | cut -d. -f1)
@@ -183,34 +183,39 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update Cargo package version
+      - name: Validate release changes
         run: |
-          sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.new_version }}"/' Cargo.toml
-          cargo check
-
-      - name: Update CHANGELOG.md
-        if: steps.labels.outputs.prerelease == 'false'
-        run: |
-          DATE=$(date +%Y-%m-%d)
-          VERSION="${{ steps.version.outputs.new_version }}"
-
-          # Add new version section after [Unreleased]
-          awk -v ver="$VERSION" -v date="$DATE" '
-            /^## \[Unreleased\]/ {
+          EXPECTED="${{ steps.version.outputs.new_version }}"
+          MANIFEST_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          LOCK_VERSION=$(awk '
+            $0 == "name = \"papercut\"" { found=1; next }
+            found && /^version = / {
+              gsub(/version = "|"/, "")
               print
-              print ""
-              print "## [" ver "] - " date
-              next
+              exit
             }
-            { print }
-          ' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
+          ' Cargo.lock)
 
-      - name: Commit and tag
+          if [ "$MANIFEST_VERSION" != "$EXPECTED" ]; then
+            echo "::error::Cargo.toml version is $MANIFEST_VERSION; expected $EXPECTED from the PR labels."
+            exit 1
+          fi
+
+          if [ "$LOCK_VERSION" != "$EXPECTED" ]; then
+            echo "::error::Cargo.lock package version is $LOCK_VERSION; expected $EXPECTED."
+            exit 1
+          fi
+
+          if ! grep -q "^## \\[$EXPECTED\\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for $EXPECTED."
+            exit 1
+          fi
+
+          cargo check --locked
+
+      - name: Tag release commit
         run: |
-          git add Cargo.toml Cargo.lock CHANGELOG.md
-          git commit -S -m "chore: release version ${{ steps.version.outputs.new_version }}"
           git tag -s "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-          git push origin main
           git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Extract changelog for release
