@@ -80,3 +80,49 @@ files:
     );
     assert!(String::from_utf8_lossy(&output.stderr).contains("Use --force"));
 }
+
+#[test]
+fn multiple_mode_generates_distinct_pdfs_for_matching_stems() {
+    let project = tempfile::tempdir().unwrap();
+    fs::create_dir(project.path().join("one")).unwrap();
+    fs::create_dir(project.path().join("two")).unwrap();
+    fs::write(project.path().join("one/source.rs"), "fn first() {}\n").unwrap();
+    fs::write(project.path().join("two/source.rs"), "fn second() {}\n").unwrap();
+    fs::write(
+        project.path().join("config.yaml"),
+        r#"
+output:
+  mode: multiple
+  directory: output
+files:
+  - path: one/source.rs
+  - path: two/source.rs
+page:
+  size: Legal
+  line_numbers: false
+  line_number_separator: false
+  vertical_borders: false
+  wrap_long_lines: false
+syntax_highlighting:
+  enabled: false
+"#,
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_papercut"))
+        .args([
+            "--config",
+            project.path().join("config.yaml").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for name in ["source-1.pdf", "source-2.pdf"] {
+        assert!(fs::read(project.path().join("output").join(name))
+            .unwrap()
+            .starts_with(b"%PDF-"));
+    }
+}

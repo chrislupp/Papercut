@@ -2,6 +2,11 @@
 
 Convert source code files to PDF with configurable headers, footers, and formatting.
 
+Papercut embeds Typst for typesetting source listings, descriptions, Markdown reports,
+and page furniture. Existing YAML and Markdown inputs work unchanged; no Typst CLI
+or package downloads are required. System fonts are supported, with bundled fallback
+fonts for portable output.
+
 Relative paths are resolved from the configuration file's directory, so a configuration behaves
 consistently regardless of the shell's current working directory.
 
@@ -39,6 +44,8 @@ brew upgrade papercut
 To uninstall: Delete Papercut.app and run `sudo rm /usr/local/bin/papercut`
 
 #### Build from Source
+
+Requires Rust 1.89 or later. The embedded typesetter increases build time and binary size.
 
 ```bash
 git clone https://github.com/chrislupp/Papercut.git
@@ -148,6 +155,7 @@ warnings:
 - `themes`: Custom theme loading and parsing errors
 - `highlighting`: Syntax highlighting failures (falls back to plain text)
 - `filesystem`: Directory walking errors, permission denied, non-UTF-8 paths
+- `rendering`: Typst layout and typesetting warnings
 
 **CLI Override:**
 Use `--quiet` to suppress all warnings regardless of config settings.

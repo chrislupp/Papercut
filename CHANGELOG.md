@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replace manual PDF layout with embedded Typst, preserving YAML and Markdown inputs.
+- Resolve contents page numbers and total pages from the typeset document.
+- Bundle fallback fonts and retain existing source syntax themes.
+- Source builds now require Rust 1.89 or later.
+
 ### Added
 - Custom font family selection for source code
 - Markdown reports with vector and raster image support
