@@ -352,6 +352,7 @@ warnings:
   - `themes`: Custom theme loading and parsing errors
   - `highlighting`: Syntax highlighting failures (falls back to plain text)
   - `filesystem`: Directory walking errors, permission denied, non-UTF-8 paths
+  - `rendering`: Typst layout and typesetting warnings
 
 ## Cover Page Configuration
 
