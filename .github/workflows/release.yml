@@ -1,26 +1,12 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      bump:
-        description: 'Version bump type (use "promote" to release current prerelease as stable)'
-        required: true
-        type: choice
-        options:
-          - promote
-          - major
-          - minor
-          - patch
-      prerelease:
-        description: 'Prerelease type (leave empty for stable release)'
-        required: false
-        type: choice
-        options:
-          - ''
-          - alpha
-          - beta
-          - rc
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -28,6 +14,10 @@ permissions:
 jobs:
   release:
     name: Create Release
+    if: >
+      github.event.pull_request.merged == true &&
+      (contains(github.event.pull_request.labels.*.name, 'release') ||
+       contains(github.event.pull_request.labels.*.name, 'prerelease'))
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.new_version }}
@@ -35,9 +25,10 @@ jobs:
       prerelease: ${{ steps.labels.outputs.prerelease }}
 
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Setup GPG for signing
@@ -66,23 +57,75 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Parse release inputs
+      - name: Parse and validate release labels
         id: labels
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
         run: |
-          echo "bump=${{ inputs.bump }}" >> $GITHUB_OUTPUT
-          if [ -n "${{ inputs.prerelease }}" ]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-            echo "pretype=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
+          echo "Labels on PR: $LABELS"
+
+          RELEASE_COUNT=0
+          PRERELEASE=false
+          BUMP=""
+          BUMP_COUNT=0
+          PRETYPE=""
+          PRETYPE_COUNT=0
+
+          for label in $LABELS; do
+            case "$label" in
+              release)
+                RELEASE_COUNT=$((RELEASE_COUNT + 1))
+                ;;
+              prerelease)
+                RELEASE_COUNT=$((RELEASE_COUNT + 1))
+                PRERELEASE=true
+                ;;
+              major|minor|patch|promote)
+                BUMP="$label"
+                BUMP_COUNT=$((BUMP_COUNT + 1))
+                ;;
+              alpha|beta|rc)
+                PRETYPE="$label"
+                PRETYPE_COUNT=$((PRETYPE_COUNT + 1))
+                ;;
+            esac
+          done
+
+          if [ "$RELEASE_COUNT" -ne 1 ]; then
+            echo "::error::PR must have exactly one of 'release' or 'prerelease'."
+            exit 1
           fi
+
+          if [ "$BUMP_COUNT" -ne 1 ]; then
+            echo "::error::PR must have exactly one of 'major', 'minor', 'patch', or 'promote'."
+            exit 1
+          fi
+
+          if [ "$PRERELEASE" = "true" ] && [ "$PRETYPE_COUNT" -ne 1 ]; then
+            echo "::error::Prerelease PRs must have exactly one of 'alpha', 'beta', or 'rc'."
+            exit 1
+          fi
+
+          if [ "$PRERELEASE" = "false" ] && [ "$PRETYPE_COUNT" -ne 0 ]; then
+            echo "::error::Stable release PRs must not have 'alpha', 'beta', or 'rc'."
+            exit 1
+          fi
+
+          if [ "$PRERELEASE" = "true" ] && [ "$BUMP" = "promote" ]; then
+            echo "::error::The 'promote' label can only be used for a stable release."
+            exit 1
+          fi
+
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "pretype=$PRETYPE" >> "$GITHUB_OUTPUT"
 
       - name: Calculate new version
         id: version
         run: |
-          # Parse current version from Cargo.toml
-          CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          echo "Current version: $CURRENT"
+          # Read the version before the release PR was merged.
+          CURRENT=$(git show HEAD^1:Cargo.toml | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Previous version: $CURRENT"
 
           # Split version
           MAJOR=$(echo "$CURRENT" | cut -d. -f1)
@@ -140,35 +183,39 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update Cargo package version
+      - name: Validate release changes
         run: |
-          sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.new_version }}"/' Cargo.toml
-          cargo metadata --no-deps --format-version 1 > /dev/null
+          EXPECTED="${{ steps.version.outputs.new_version }}"
+          MANIFEST_VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          LOCK_VERSION=$(awk '
+            $0 == "name = \"papercut\"" { found=1; next }
+            found && /^version = / {
+              gsub(/version = "|"/, "")
+              print
+              exit
+            }
+          ' Cargo.lock)
+
+          if [ "$MANIFEST_VERSION" != "$EXPECTED" ]; then
+            echo "::error::Cargo.toml version is $MANIFEST_VERSION; expected $EXPECTED from the PR labels."
+            exit 1
+          fi
+
+          if [ "$LOCK_VERSION" != "$EXPECTED" ]; then
+            echo "::error::Cargo.lock package version is $LOCK_VERSION; expected $EXPECTED."
+            exit 1
+          fi
+
+          if ! grep -q "^## \\[$EXPECTED\\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section for $EXPECTED."
+            exit 1
+          fi
+
           cargo check --locked
 
-      - name: Update CHANGELOG.md
-        if: steps.labels.outputs.prerelease == 'false'
+      - name: Tag release commit
         run: |
-          DATE=$(date +%Y-%m-%d)
-          VERSION="${{ steps.version.outputs.new_version }}"
-
-          # Add new version section after [Unreleased]
-          awk -v ver="$VERSION" -v date="$DATE" '
-            /^## \[Unreleased\]/ {
-              print
-              print ""
-              print "## [" ver "] - " date
-              next
-            }
-            { print }
-          ' CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
-
-      - name: Commit and tag
-        run: |
-          git add Cargo.toml Cargo.lock CHANGELOG.md
-          git commit -S -m "chore: release version ${{ steps.version.outputs.new_version }}"
           git tag -s "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-          git push origin main
           git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Extract changelog for release

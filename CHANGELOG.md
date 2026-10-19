@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundle fallback fonts and retain existing source syntax themes.
 - Source builds now require Rust 1.89 or later.
 
+## [1.1.0] - 2026-07-28
+
 ### Added
 - Custom font family selection for source code
 - Markdown reports with vector and raster image support
