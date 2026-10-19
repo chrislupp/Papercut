@@ -37,6 +37,7 @@ pub enum WarningCategory {
     Themes,
     Highlighting,
     Filesystem,
+    Rendering,
 }
 
 impl WarningCategory {
@@ -47,6 +48,7 @@ impl WarningCategory {
             "themes" => Some(Self::Themes),
             "highlighting" => Some(Self::Highlighting),
             "filesystem" => Some(Self::Filesystem),
+            "rendering" => Some(Self::Rendering),
             _ => None,
         }
     }
@@ -58,6 +60,7 @@ impl WarningCategory {
             Self::Themes => "themes",
             Self::Highlighting => "highlighting",
             Self::Filesystem => "filesystem",
+            Self::Rendering => "rendering",
         }
     }
 }

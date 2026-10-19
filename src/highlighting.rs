@@ -41,7 +41,6 @@ use syntect::util::LinesWithEndings;
 pub struct StyledSegment {
     pub text: String,
     pub foreground: Color,
-    pub background: Color,
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
@@ -278,7 +277,6 @@ pub fn highlight_code_styled(
             segments.push(StyledSegment {
                 text: text.to_string(),
                 foreground: style.foreground,
-                background: style.background,
                 bold: style
                     .font_style
                     .contains(syntect::highlighting::FontStyle::BOLD),

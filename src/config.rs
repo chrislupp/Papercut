@@ -503,7 +503,7 @@ pub struct WarningsConfig {
     /// Enable or disable all warnings
     #[serde(default = "default_true")]
     pub enabled: bool,
-    /// List of warning categories to silence: fonts, themes, highlighting, filesystem
+    /// List of warning categories to silence: fonts, themes, highlighting, filesystem, rendering
     #[serde(default)]
     pub silence_categories: Vec<String>,
 }

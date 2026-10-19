@@ -26,14 +26,10 @@
 // therein. The DoD does not exercise any editorial, security, or other
 // control over the information you may find at these locations.
 
-mod colors;
-mod cover_page;
-mod fonts;
 mod generator;
-mod header_footer;
-mod krilla_doc;
-mod markdown_renderer;
+mod markdown;
 #[cfg(feature = "syntax-highlighting")]
 pub mod themes;
+mod typst_renderer;
 
 pub use generator::generate;

@@ -510,3 +510,28 @@ header:
 - [Configuration Reference](configuration.md) - Complete configuration options
 - [Usage Guide](usage.md) - CLI usage instructions
 - [Examples](examples.md) - Real-world configuration examples
+
+## Typst rendering
+
+Papercut compiles an internal Typst document and exports it directly to PDF.
+Keep using the same YAML configuration and Markdown reports; no `.typ` files
+or external Typst installation are needed. Descriptions remain plain text,
+and Typst syntax in source code or descriptions is printed literally.
+
+Typst handles pagination, font shaping, and table-of-contents page numbers.
+Page totals include the cover, contents, and Markdown report. Layout and page
+breaks can differ from older Papercut releases. Existing syntax themes and
+custom Sublime syntax definitions continue to apply to source listings.
+
+Source listings use the configured monospace font, with bundled DejaVu Sans
+Mono as a fallback. Wrapping uses the selected font's measured character width,
+keeps the original line number on the first row, and indents continuation rows.
+Tabs expand to four spaces. With wrapping disabled, overflowing code is clipped
+to the content area. Use a monospace font for aligned listings.
+
+Markdown supports headings, paragraphs, emphasis, links, lists, block quotes,
+fenced code, tables, and local images. Image paths are resolved relative to the
+Markdown file. Missing images produce a filesystem warning and their alt text.
+Remote images are not downloaded. HTML is displayed as literal text.
+
+Multiple-output mode continues to produce one source-only PDF per file.
